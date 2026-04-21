@@ -9,6 +9,7 @@ const nav = [
   { to: '/admin/fraud',    label: '부정이용 감지',  icon: '🚨' },
   { to: '/admin/missions', label: '게임·미션',      icon: '🎮' },
   { to: '/admin/referral', label: '추천 프로그램',  icon: '🔗' },
+  { to: '/admin/inquiry', label: '문의 관리',       icon: '💬' },
 ]
 
 export default function Layout({ children }) {

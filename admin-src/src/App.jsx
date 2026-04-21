@@ -10,6 +10,7 @@ import RafflePage from './pages/raffle/RafflePage'
 import FraudPage from './pages/fraud/FraudPage'
 import MissionsPage from './pages/missions/MissionsPage'
 import ReferralPage from './pages/referral/ReferralPage'
+import InquiryPage from './pages/inquiry/InquiryPage'
 
 function ProtectedRoute({ children }) {
   const { user, isAdmin, loading } = useAuth()
@@ -39,6 +40,7 @@ export default function App() {
                 <Route path="fraud" element={<FraudPage />} />
                 <Route path="missions" element={<MissionsPage />} />
                 <Route path="referral" element={<ReferralPage />} />
+                <Route path="inquiry" element={<InquiryPage />} />
                 <Route path="*" element={<Navigate to="/admin" replace />} />
               </Routes>
             </Layout>
