@@ -72,6 +72,20 @@ function ReplyModal({ inquiry, onClose }) {
             <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
               {inquiry.body}
             </div>
+            {/* 첨부 이미지 */}
+            {inquiry.image_urls?.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {inquiry.image_urls.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={url}
+                      alt={`添付画像 ${i + 1}`}
+                      className="w-24 h-24 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition-opacity cursor-zoom-in"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 이미 답변한 경우 */}
