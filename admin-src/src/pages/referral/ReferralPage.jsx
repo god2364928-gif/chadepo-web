@@ -12,7 +12,7 @@ export default function ReferralPage() {
     queryFn: async () => {
       let q = supabase
         .from('referral_events')
-        .select('*, referrer:profiles!referrer_id(nickname), referee:profiles!referee_id(nickname)')
+        .select('id, referrer_id, referee_id, status, ad_watch_count, referee_bonus_granted, referee_bonus_amount, referrer_bonus_granted, referrer_bonus_amount, created_at, referrer:profiles!referrer_id(nickname), referee:profiles!referee_id(nickname)')
         .order('created_at', { ascending: false })
         .limit(100)
       if (filter !== 'all') q = q.eq('status', filter)
@@ -97,6 +97,9 @@ export default function ReferralPage() {
                   <tr>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium">초대한 사람</th>
                     <th className="text-left px-4 py-3 text-gray-500 font-medium">초대받은 사람</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium">광고</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium">보상(초대자)</th>
+                    <th className="text-right px-4 py-3 text-gray-500 font-medium">보상(신규)</th>
                     <th className="text-right px-4 py-3 text-gray-500 font-medium">날짜</th>
                     <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
                     <th className="text-right px-4 py-3 text-gray-500 font-medium">처리</th>
@@ -107,13 +110,26 @@ export default function ReferralPage() {
                     <tr key={e.id} className={`hover:bg-gray-50 ${e.status === 'flagged' ? 'bg-red-50' : ''}`}>
                       <td className="px-4 py-3">
                         <Link to={`/admin/users/${e.referrer_id}`} className="text-brand hover:underline text-xs">
-                          {e.referrer?.nickname ?? '—'}
+                          {e.referrer?.nickname || `ユーザー${e.referrer_id?.slice(0, 4)}`}
                         </Link>
                       </td>
                       <td className="px-4 py-3">
                         <Link to={`/admin/users/${e.referee_id}`} className="text-brand hover:underline text-xs">
-                          {e.referee?.nickname ?? '—'}
+                          {e.referee?.nickname || `ユーザー${e.referee_id?.slice(0, 4)}`}
                         </Link>
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-gray-600">
+                        {e.ad_watch_count ?? 0}회
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs">
+                        {e.referrer_bonus_granted
+                          ? <span className="text-green-600 font-medium">+{e.referrer_bonus_amount ?? 0} E</span>
+                          : <span className="text-gray-400">미지급</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs">
+                        {e.referee_bonus_granted
+                          ? <span className="text-green-600 font-medium">+{e.referee_bonus_amount ?? 0} P</span>
+                          : <span className="text-gray-400">미지급</span>}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-400 text-xs whitespace-nowrap">
                         {new Date(e.created_at).toLocaleDateString('ko-KR')}
@@ -132,7 +148,7 @@ export default function ReferralPage() {
                     </tr>
                   ))}
                   {(events ?? []).length === 0 && (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">내역 없음</td></tr>
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">내역 없음</td></tr>
                   )}
                 </tbody>
               </table>
@@ -148,7 +164,7 @@ export default function ReferralPage() {
               <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
                 <div className="flex items-center gap-2">
                   <span className="text-gray-400 text-xs w-5">{i + 1}</span>
-                  <span className="text-sm font-medium">{b.nickname}</span>
+                  <span className="text-sm font-medium">{b.nickname || '—'}</span>
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-bold text-blue-600">+{b.total?.toLocaleString()} E</div>

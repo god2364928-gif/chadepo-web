@@ -47,7 +47,7 @@ export default function Dashboard() {
     queryFn: async () => {
       const { data } = await supabase
         .from('exchange_requests')
-        .select('id, points_spent, status, created_at, profiles(nickname), exchange_items(title_ja)')
+        .select('id, points_spent, status, created_at, user_id, profiles!user_id(nickname), exchange_items!item_id(title_ja)')
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(5)
@@ -101,7 +101,7 @@ export default function Dashboard() {
                 <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="py-2.5">
                     <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">
-                      {u.nickname ?? '(없음)'}
+                      {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
                     </Link>
                   </td>
                   <td className="py-2.5 text-right text-gray-700">{u.points?.toLocaleString()} P</td>
@@ -130,7 +130,7 @@ export default function Dashboard() {
             {pendingExchanges.map(ex => (
               <div key={ex.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                 <div>
-                  <span className="font-medium text-sm">{ex.profiles?.nickname}</span>
+                  <span className="font-medium text-sm">{ex.profiles?.nickname || `ユーザー${ex.user_id?.slice(0, 4)}`}</span>
                   <span className="text-gray-400 text-xs ml-2">{ex.exchange_items?.title_ja}</span>
                 </div>
                 <div className="flex items-center gap-3">

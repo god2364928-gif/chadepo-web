@@ -112,7 +112,7 @@ export default function FraudPage() {
               {(flagged ?? []).map(u => (
                 <tr key={u.id} className="hover:bg-red-50">
                   <td className="px-4 py-3">
-                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">{u.nickname}</Link>
+                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">{u.nickname || `ユーザー${u.id.slice(0, 4)}`}</Link>
                   </td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{u.signup_ip ?? '—'}</td>
                   <td className="px-4 py-3 text-right font-medium">{u.points?.toLocaleString()} P</td>
@@ -152,7 +152,7 @@ export default function FraudPage() {
               <div className="space-y-1">
                 {users.map(u => (
                   <div key={u.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
-                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline">{u.nickname}</Link>
+                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline">{u.nickname || `ユーザー${u.id.slice(0, 4)}`}</Link>
                     <div className="flex items-center gap-2">
                       <span className="text-gray-400 text-xs">{new Date(u.created_at).toLocaleDateString('ko-KR')}</span>
                       {u.is_banned && <span className="badge-red text-xs">정지</span>}
@@ -188,7 +188,7 @@ export default function FraudPage() {
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
                   <td className="px-4 py-3">
-                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">{u.nickname}</Link>
+                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">{u.nickname || `ユーザー${u.id.slice(0, 4)}`}</Link>
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-gray-900">{u.points?.toLocaleString()} P</td>
                   <td className="px-4 py-3 text-right text-gray-500">{u.self_earned_points?.toLocaleString()} P</td>
