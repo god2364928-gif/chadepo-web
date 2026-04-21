@@ -48,6 +48,18 @@ const MISSION_TYPE_LABELS = {
   survey:      'アンケート',
 }
 
+// 신형 일일 미션: mission_key (텍스트) → 일본어 표기
+const MISSION_KEY_LABELS = {
+  daily_attendance: '出席チェック',
+  play_game:        'ゲームプレイ',
+  energy_20:        'エネルギー20回',
+  feed_20:          'エサやり20回',
+  raffle_20:        '応募20回',
+  sanpo:            'お散歩3000歩',
+  sugoroku:         'すごろく',
+  steps_1000:       '1000歩あるく',
+}
+
 const CATEGORY_LABELS = {
   daily:   { label: 'デイリー', cls: 'bg-orange-100 text-orange-700' },
   regular: { label: 'レギュラー', cls: 'bg-indigo-100 text-indigo-700' },
@@ -92,12 +104,13 @@ export default function MissionsPage() {
   })
 
   // ── 오늘 미션 현황 탭 (mission_completions) ───────────────
+  // mission_id(UUID)가 있으면 구형 미션, mission_key(텍스트)가 있으면 신형 퀘스트 미션
   const { data: missionCompletions } = useQuery({
     queryKey: ['mission-completions-today'],
     queryFn: async () => {
       const { data } = await supabase
         .from('mission_completions')
-        .select('*, mission_definitions!mission_id(title_ja, type), profiles!user_id(nickname)')
+        .select('id, user_id, mission_id, mission_key, points_earned, ad_watched, attempt_no, created_at, profiles!user_id(nickname)')
         .eq('completion_date', todayString())
         .order('created_at', { ascending: false })
         .limit(200)
@@ -386,7 +399,7 @@ export default function MissionsPage() {
                 <tr>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">유저</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">미션</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">타입</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">종류</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">횟수</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">광고</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">획득 P</th>
@@ -396,14 +409,24 @@ export default function MissionsPage() {
               <tbody className="divide-y divide-gray-100">
                 {(missionCompletions ?? []).map(mc => {
                   const nickname = mc.profiles?.nickname || `ユーザー${mc.user_id?.slice(0, 4)}`
-                  const mType = mc.mission_definitions?.type
+
+                  // 신형(mission_key) vs 구형(mission_id) 분기
+                  const isNewStyle = !mc.mission_id && mc.mission_key
+                  const missionLabel = isNewStyle
+                    ? (MISSION_KEY_LABELS[mc.mission_key] ?? mc.mission_key)
+                    : '(구형 미션)'
+                  const kindLabel = isNewStyle ? '퀘스트' : '일반'
+                  const kindCls = isNewStyle
+                    ? 'bg-orange-50 text-orange-600'
+                    : 'bg-indigo-50 text-indigo-600'
+
                   return (
                     <tr key={mc.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium">{nickname}</td>
-                      <td className="px-4 py-3">{mc.mission_definitions?.title_ja ?? '—'}</td>
+                      <td className="px-4 py-3">{missionLabel}</td>
                       <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium">
-                          {MISSION_TYPE_LABELS[mType] ?? mType ?? '—'}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${kindCls}`}>
+                          {kindLabel}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-gray-500">{mc.attempt_no ?? 1}회차</td>
@@ -414,7 +437,12 @@ export default function MissionsPage() {
                           {mc.ad_watched ? '시청' : '미시청'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-green-600 font-medium">+{mc.points_earned} P</td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {mc.points_earned > 0
+                          ? <span className="text-green-600">+{mc.points_earned} P</span>
+                          : <span className="text-gray-400 text-xs">퀘스트박스</span>
+                        }
+                      </td>
                       <td className="px-4 py-3 text-right text-gray-400 text-xs">
                         {new Date(mc.created_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                       </td>
