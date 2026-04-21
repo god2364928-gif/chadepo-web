@@ -115,35 +115,42 @@ export default function RafflePage() {
     onSuccess: () => qc.invalidateQueries(['raffle-winners', selectedRound?.id]),
   })
 
-  const [drawResult, setDrawResult] = useState(null)
-  const [drawError, setDrawError]   = useState('')
+  const [pickError, setPickError] = useState('')
 
-  const drawRound = useMutation({
-    mutationFn: async (roundId) => {
-      const { data, error } = await supabase.rpc('admin_draw_raffle_round', { p_round_id: roundId })
-      if (error) throw new Error(error.message)
-      return data?.[0]
+  const pickWinner = useMutation({
+    mutationFn: async ({ userId, nickname }) => {
+      // 1) raffle_winners에 당첨자 등록
+      const { error: winErr } = await supabase.from('raffle_winners').insert({
+        round_id:        selectedRound.id,
+        user_id:         userId,
+        prize_delivered: false,
+      })
+      if (winErr) throw new Error(winErr.message)
+
+      // 2) 회차 완료 처리
+      const { error: rndErr } = await supabase
+        .from('raffle_rounds')
+        .update({ status: 'completed', drawn_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', selectedRound.id)
+      if (rndErr) throw new Error(rndErr.message)
+
+      return nickname
     },
-    onSuccess: (result) => {
-      setDrawResult(result)
-      setDrawError('')
+    onSuccess: () => {
+      setPickError('')
       qc.invalidateQueries(['raffle-rounds', selectedItemId])
       qc.invalidateQueries(['raffle-winners', selectedRound?.id])
     },
-    onError: (err) => {
-      setDrawError(err.message)
-    },
+    onError: (err) => setPickError(err.message),
   })
 
-  const handleDraw = () => {
-    if (!selectedRound) return
+  const handlePickWinner = (userId, nickname) => {
     const ok = window.confirm(
-      `⚠️ 추첨을 실행합니다.\n\n회차: #${selectedRound.round_no}\n응모자: ${entries?.length ?? 0}명\n\n한 번 실행하면 되돌릴 수 없습니다. 진행하시겠습니까?`
+      `⚠️ 당첨자로 지정합니다.\n\n당첨자: ${nickname}\n회차: #${selectedRound.round_no}\n\n한 번 지정하면 되돌릴 수 없습니다. 진행하시겠습니까?`
     )
     if (!ok) return
-    setDrawResult(null)
-    setDrawError('')
-    drawRound.mutate(selectedRound.id)
+    setPickError('')
+    pickWinner.mutate({ userId, nickname })
   }
 
   const totalTickets = entries?.reduce((s, e) => s + (e.entry_count ?? 0), 0) ?? 0
@@ -286,43 +293,19 @@ export default function RafflePage() {
                   </div>
                 )}
 
-                {/* 수동 추첨 영역 (100만P 전용) */}
+                {/* 100만P 안내 */}
                 {isManualItem && selectedRound.status === 'active' && (
-                  <div className="mt-3 p-4 bg-purple-50 rounded-lg border border-purple-200 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-purple-800">수동 추첨 실행</p>
-                        <p className="text-xs text-purple-600 mt-0.5">
-                          현재 응모자 {uniqueUsers}명 · 티켓 {totalTickets.toLocaleString()}장
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleDraw}
-                        disabled={drawRound.isPending || uniqueUsers === 0}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-                      >
-                        {drawRound.isPending ? '추첨 중...' : '🎯 추첨 실행'}
-                      </button>
-                    </div>
-                    {uniqueUsers === 0 && (
-                      <p className="text-xs text-purple-500">응모자가 없어 추첨을 실행할 수 없습니다</p>
-                    )}
+                  <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <p className="text-sm font-semibold text-purple-800">👇 아래 응모자 목록에서 당첨자를 직접 선택하세요</p>
+                    <p className="text-xs text-purple-600 mt-0.5">
+                      현재 응모자 {uniqueUsers}명 · 티켓 {totalTickets.toLocaleString()}장
+                    </p>
                   </div>
                 )}
 
-                {/* 추첨 결과 표시 */}
-                {drawResult && (
-                  <div className="mt-3 p-4 bg-green-50 rounded-lg border border-green-300">
-                    <p className="text-sm font-semibold text-green-800 mb-1">🎉 추첨 완료!</p>
-                    <p className="text-sm text-green-700">
-                      당첨자: <strong>{drawResult.nickname}</strong> — {drawResult.prize_value?.toLocaleString()} P 지급
-                    </p>
-                    <p className="text-xs text-green-600 mt-1">{drawResult.message}</p>
-                  </div>
-                )}
-                {drawError && (
+                {pickError && (
                   <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
-                    <p className="text-xs text-red-700">오류: {drawError}</p>
+                    <p className="text-xs text-red-700">오류: {pickError}</p>
                   </div>
                 )}
               </div>
@@ -380,7 +363,7 @@ export default function RafflePage() {
                 <h3 className="font-semibold text-gray-900 mb-3">
                   응모자 ({uniqueUsers}명 / 티켓 {totalTickets.toLocaleString()}장)
                 </h3>
-                <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <div className="overflow-x-auto max-h-96 overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-white border-b border-gray-100">
                       <tr className="text-xs text-gray-500">
@@ -390,27 +373,44 @@ export default function RafflePage() {
                         <th className="text-right pb-2">광고</th>
                         <th className="text-right pb-2">천장</th>
                         <th className="text-right pb-2">응모일</th>
+                        {isManualItem && selectedRound.status === 'active' && (
+                          <th className="text-right pb-2">선택</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {(entries ?? []).map(e => (
-                        <tr key={e.user_id} className="hover:bg-gray-50">
-                          <td className="py-2">
-                            <Link to={`/admin/users/${e.user_id}`} className="text-brand hover:underline text-xs">
-                              {e.profiles?.nickname || `ユーザー${e.user_id?.slice(0, 4)}`}
-                            </Link>
-                          </td>
-                          <td className="py-2 text-right font-medium">{e.entry_count?.toLocaleString()}</td>
-                          <td className="py-2 text-right text-gray-500">{e.energy_spent?.toLocaleString()}</td>
-                          <td className="py-2 text-right">{e.ad_watched ? '✅' : '—'}</td>
-                          <td className="py-2 text-right">{e.is_ceiling_win ? '🏆' : '—'}</td>
-                          <td className="py-2 text-right text-gray-400 text-xs">
-                            {new Date(e.created_at).toLocaleDateString('ko-KR')}
-                          </td>
-                        </tr>
-                      ))}
+                      {(entries ?? []).map(e => {
+                        const nickname = e.profiles?.nickname || `ユーザー${e.user_id?.slice(0, 4)}`
+                        return (
+                          <tr key={e.user_id} className="hover:bg-gray-50">
+                            <td className="py-2">
+                              <Link to={`/admin/users/${e.user_id}`} className="text-brand hover:underline text-xs">
+                                {nickname}
+                              </Link>
+                            </td>
+                            <td className="py-2 text-right font-medium">{e.entry_count?.toLocaleString()}</td>
+                            <td className="py-2 text-right text-gray-500">{e.energy_spent?.toLocaleString()}</td>
+                            <td className="py-2 text-right">{e.ad_watched ? '✅' : '—'}</td>
+                            <td className="py-2 text-right">{e.is_ceiling_win ? '🏆' : '—'}</td>
+                            <td className="py-2 text-right text-gray-400 text-xs">
+                              {new Date(e.created_at).toLocaleDateString('ko-KR')}
+                            </td>
+                            {isManualItem && selectedRound.status === 'active' && (
+                              <td className="py-2 text-right">
+                                <button
+                                  onClick={() => handlePickWinner(e.user_id, nickname)}
+                                  disabled={pickWinner.isPending}
+                                  className="px-2 py-1 text-xs font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg transition-colors whitespace-nowrap"
+                                >
+                                  🏆 당첨 지정
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        )
+                      })}
                       {entries?.length === 0 && (
-                        <tr><td colSpan={6} className="py-6 text-center text-gray-400 text-xs">응모자 없음</td></tr>
+                        <tr><td colSpan={isManualItem ? 7 : 6} className="py-6 text-center text-gray-400 text-xs">응모자 없음</td></tr>
                       )}
                     </tbody>
                   </table>
