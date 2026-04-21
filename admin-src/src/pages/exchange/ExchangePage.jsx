@@ -6,20 +6,28 @@ import { supabase } from '../../lib/supabase'
 function ItemModal({ item, onClose }) {
   const qc = useQueryClient()
   const [form, setForm] = useState({
-    title_ja:   item?.title_ja ?? '',
-    point_cost: item?.point_cost ?? '',
-    min_points: item?.min_points ?? '',
-    face_value: item?.face_value ?? '',
-    method:     item?.method ?? '',
-    sort_order: item?.sort_order ?? 0,
-    is_active:  item?.is_active ?? true,
+    title_ja:    item?.title_ja ?? '',
+    point_cost:  item?.point_cost ?? '',
+    min_points:  item?.min_points ?? '',
+    face_value:  item?.face_value ?? '',
+    daily_limit: item?.daily_limit ?? '',
+    method:      item?.method ?? '',
+    sort_order:  item?.sort_order ?? 0,
+    is_active:   item?.is_active ?? true,
   })
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true)
-    const payload = { ...form, point_cost: Number(form.point_cost), min_points: Number(form.min_points), sort_order: Number(form.sort_order) }
+    const payload = {
+      ...form,
+      point_cost:  Number(form.point_cost),
+      min_points:  Number(form.min_points),
+      face_value:  form.face_value !== '' ? Number(form.face_value) : null,
+      daily_limit: form.daily_limit !== '' ? Number(form.daily_limit) : null,
+      sort_order:  Number(form.sort_order),
+    }
     const q = item
       ? supabase.from('exchange_items').update(payload).eq('id', item.id)
       : supabase.from('exchange_items').insert(payload)
@@ -36,17 +44,18 @@ function ItemModal({ item, onClose }) {
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {[
-            { label: '상품명 (일본어)', key: 'title_ja', type: 'text', placeholder: 'Amazonギフトカード 500円' },
-            { label: '방식 (method)', key: 'method', type: 'text', placeholder: 'amazon_gift' },
-            { label: '액면가', key: 'face_value', type: 'text', placeholder: '500' },
-            { label: '필요 포인트', key: 'point_cost', type: 'number', placeholder: '5000' },
-            { label: '최소 보유 포인트', key: 'min_points', type: 'number', placeholder: '1000' },
-            { label: '정렬 순서', key: 'sort_order', type: 'number', placeholder: '0' },
-          ].map(({ label, key, type, placeholder }) => (
+            { label: '상품명 (일본어)', key: 'title_ja',    type: 'text',   placeholder: 'Amazonギフトカード 500円', required: true },
+            { label: '방식 (method)', key: 'method',       type: 'text',   placeholder: 'amazon_gift',            required: true },
+            { label: '액면가 (円)',   key: 'face_value',   type: 'number', placeholder: '500',                    required: false },
+            { label: '필요 포인트',   key: 'point_cost',   type: 'number', placeholder: '5000',                   required: true },
+            { label: '최소 보유 P',   key: 'min_points',   type: 'number', placeholder: '5000',                   required: true },
+            { label: '일일 한도',     key: 'daily_limit',  type: 'number', placeholder: '비워두면 무제한',         required: false },
+            { label: '정렬 순서',     key: 'sort_order',   type: 'number', placeholder: '0',                      required: true },
+          ].map(({ label, key, type, placeholder, required }) => (
             <div key={key}>
               <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
               <input type={type} className="input" placeholder={placeholder}
-                value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} required />
+                value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} required={required} />
             </div>
           ))}
           <div className="flex items-center gap-2">
@@ -75,7 +84,7 @@ export default function ExchangePage() {
     queryFn: async () => {
       let q = supabase
         .from('exchange_requests')
-        .select('*, profiles(nickname), exchange_items(title_ja)')
+        .select('*, profiles!user_id(nickname), exchange_items!item_id(title_ja, method)')
         .order('created_at', { ascending: false })
         .limit(100)
       if (filter !== 'all') q = q.eq('status', filter)
@@ -146,12 +155,28 @@ export default function ExchangePage() {
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString('ko-KR')}</td>
                     <td className="px-4 py-3">
-                      <Link to={`/admin/users/${r.user_id}`} className="text-brand hover:underline">{r.profiles?.nickname}</Link>
+                      <Link to={`/admin/users/${r.user_id}`} className="text-brand hover:underline">
+                        {r.profiles?.nickname || `ユーザー${r.user_id?.slice(0, 4)}`}
+                      </Link>
                     </td>
-                    <td className="px-4 py-3">{r.exchange_items?.title_ja}</td>
+                    <td className="px-4 py-3">
+                      <div>{r.exchange_items?.title_ja ?? '—'}</div>
+                      {r.exchange_items?.method && (
+                        <div className="text-xs text-gray-400">{r.exchange_items.method}</div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right font-medium">{r.points_spent?.toLocaleString()} P</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={r.status === 'pending' ? 'badge-yellow' : r.status === 'completed' ? 'badge-green' : 'badge-gray'}>{r.status}</span>
+                      <span className={
+                        r.status === 'pending'    ? 'badge-yellow' :
+                        r.status === 'processing' ? 'badge-blue'   :
+                        r.status === 'completed'  ? 'badge-green'  : 'badge-gray'
+                      }>
+                        {r.status === 'pending'    ? '대기중'   :
+                         r.status === 'processing' ? '처리중'   :
+                         r.status === 'completed'  ? '완료'     :
+                         r.status === 'failed'     ? '실패'     : r.status}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       {(r.status === 'pending' || r.status === 'processing') && (
@@ -180,8 +205,10 @@ export default function ExchangePage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">상품명</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">방식</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">필요 P</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">최소 P</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">일일 한도</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">순서</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">노출</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">수정</th>
@@ -191,8 +218,10 @@ export default function ExchangePage() {
                 {(items ?? []).map(it => (
                   <tr key={it.id} className={`hover:bg-gray-50 ${!it.is_active ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-3 font-medium">{it.title_ja}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{it.method ?? '—'}</td>
                     <td className="px-4 py-3 text-right">{it.point_cost?.toLocaleString()} P</td>
                     <td className="px-4 py-3 text-right">{it.min_points?.toLocaleString()} P</td>
+                    <td className="px-4 py-3 text-right text-gray-500">{it.daily_limit ?? '무제한'}</td>
                     <td className="px-4 py-3 text-right">{it.sort_order}</td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => toggleActive.mutate({ id: it.id, val: !it.is_active })}
