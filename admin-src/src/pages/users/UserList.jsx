@@ -85,7 +85,7 @@ export default function UserList() {
                     <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">
-                          {u.nickname ?? '(없음)'}
+                          {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
                         </Link>
                         <div className="text-gray-400 text-xs">{u.referral_code}</div>
                       </td>

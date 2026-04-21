@@ -183,7 +183,7 @@ export default function UserDetail() {
 
       <div className="flex items-center gap-3">
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-sm">← 뒤로</button>
-        <h1 className="text-2xl font-bold text-gray-900">{user.nickname ?? '(닉네임 없음)'}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{user.nickname || `ユーザー${user.id.slice(0, 4)}`}</h1>
         {user.is_banned && <span className="badge-red">정지</span>}
         {user.is_flagged && <span className="badge-yellow">의심</span>}
       </div>
