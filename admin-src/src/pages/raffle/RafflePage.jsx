@@ -69,9 +69,10 @@ export default function RafflePage() {
   })
 
   const statusBadge = (s) => {
-    if (s === 'open')   return <span className="badge-green">진행중</span>
-    if (s === 'drawn')  return <span className="badge-blue">추첨완료</span>
-    if (s === 'closed') return <span className="badge-gray">종료</span>
+    if (s === 'active')    return <span className="badge-green">진행중</span>
+    if (s === 'drawing')   return <span className="badge-blue">추첨중</span>
+    if (s === 'completed') return <span className="badge-blue">추첨완료</span>
+    if (s === 'cancelled') return <span className="badge-gray">취소</span>
     return <span className="badge-gray">{s}</span>
   }
 
@@ -114,7 +115,7 @@ export default function RafflePage() {
           ) : (
             <>
               {/* 수동 추첨 */}
-              {selectedRound.status === 'open' && (
+              {selectedRound.status === 'active' && (
                 <div className="card border-brand border">
                   <div className="flex items-center justify-between">
                     <div>

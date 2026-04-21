@@ -94,10 +94,10 @@ export default function ExchangePage() {
 
   const deliver = useMutation({
     mutationFn: async (id) => {
-      const { error } = await supabase.from('exchange_requests').update({ status: 'delivered' }).eq('id', id)
+      const { error } = await supabase.from('exchange_requests').update({ status: 'completed' }).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries(['exchange-requests']),
+    onSuccess: () => qc.invalidateQueries(['exchange-requests', filter]),
   })
 
   const toggleActive = useMutation({
@@ -124,7 +124,7 @@ export default function ExchangePage() {
       {tab === 'requests' && (
         <div className="space-y-4">
           <div className="flex gap-2">
-            {[['pending', '대기 중'], ['delivered', '처리완료'], ['all', '전체']].map(([v, l]) => (
+            {[['pending', '대기 중'], ['completed', '처리완료'], ['all', '전체']].map(([v, l]) => (
               <button key={v} onClick={() => setFilter(v)}
                 className={filter === v ? 'btn-primary text-xs py-1.5 px-3' : 'btn-secondary text-xs py-1.5 px-3'}>{l}</button>
             ))}
@@ -151,11 +151,11 @@ export default function ExchangePage() {
                     <td className="px-4 py-3">{r.exchange_items?.title_ja}</td>
                     <td className="px-4 py-3 text-right font-medium">{r.points_spent?.toLocaleString()} P</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={r.status === 'pending' ? 'badge-yellow' : 'badge-green'}>{r.status}</span>
+                      <span className={r.status === 'pending' ? 'badge-yellow' : r.status === 'completed' ? 'badge-green' : 'badge-gray'}>{r.status}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {r.status === 'pending' && (
-                        <button onClick={() => deliver.mutate(r.id)} className="text-xs text-brand hover:underline">발송완료 처리</button>
+                      {(r.status === 'pending' || r.status === 'processing') && (
+                        <button onClick={() => deliver.mutate(r.id)} className="text-xs text-brand hover:underline">완료 처리</button>
                       )}
                     </td>
                   </tr>
