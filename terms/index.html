@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>利用規約 — チャデポ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      line-height: 1.8;
+      font-size: 15px;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      padding: 16px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 780px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #e8531e;
+      text-decoration: none;
+    }
+    .header-nav a {
+      font-size: 0.85rem;
+      color: #555;
+      text-decoration: none;
+      margin-left: 20px;
+    }
+    .header-nav a:hover { color: #e8531e; }
+
+    main {
+      max-width: 780px;
+      margin: 40px auto;
+      padding: 0 20px 80px;
+    }
+
+    .doc-header {
+      background: #fff;
+      border-radius: 16px;
+      padding: 40px 48px;
+      margin-bottom: 8px;
+      border: 1px solid #eee;
+    }
+    .doc-header h1 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 12px;
+    }
+    .doc-meta {
+      font-size: 0.82rem;
+      color: #888;
+    }
+    .doc-meta span { margin-right: 20px; }
+
+    .intro-box {
+      background: #fff9f5;
+      border: 1px solid #ffd9c4;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 16px 0;
+      font-size: 0.88rem;
+      color: #5a3a2a;
+      line-height: 1.7;
+    }
+
+    .toc {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin: 16px 0;
+      border: 1px solid #eee;
+    }
+    .toc h2 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+    .toc ol {
+      list-style: none;
+    }
+    .toc li {
+      padding: 4px 0;
+    }
+    .toc li a {
+      font-size: 0.88rem;
+      color: #555;
+      text-decoration: none;
+    }
+    .toc li a:hover { color: #e8531e; }
+
+    .section {
+      background: #fff;
+      border-radius: 12px;
+      padding: 32px 36px;
+      margin: 12px 0;
+      border: 1px solid #eee;
+    }
+    .section h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #e8531e;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #fff0ea;
+    }
+    .section p {
+      font-size: 0.9rem;
+      color: #333;
+      margin-bottom: 10px;
+      line-height: 1.85;
+    }
+    .section p:last-child { margin-bottom: 0; }
+
+    .badge-new {
+      display: inline-block;
+      background: #e8531e;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+      letter-spacing: 0.04em;
+    }
+
+    .highlight-box {
+      background: #fffbea;
+      border: 1px solid #ffe58f;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 12px 0;
+      font-size: 0.88rem;
+      color: #5a4a00;
+    }
+
+    .contact-box {
+      background: #f0f7ff;
+      border: 1px solid #c8dff5;
+      border-radius: 12px;
+      padding: 24px 28px;
+    }
+    .contact-box h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #1a3a5a;
+    }
+    .contact-box p { font-size: 0.88rem; color: #3a5a7a; margin-bottom: 6px; }
+    .contact-box a { color: #1a6ac4; }
+
+    footer {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 0 20px 40px;
+      text-align: center;
+      font-size: 0.78rem;
+      color: #aaa;
+    }
+    footer a { color: #aaa; }
+
+    @media (max-width: 600px) {
+      .doc-header { padding: 28px 20px; }
+      .section { padding: 24px 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="brand" href="/">チャデポ</a>
+    <nav class="header-nav">
+      <a href="/privacy">プライバシーポリシー</a>
+      <a href="/terms">利用規約</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <div class="doc-header">
+    <h1>利用規約</h1>
+    <div class="doc-meta">
+      <span>制定日: 2026年4月20日</span>
+      <span>最終更新: 2026年4月21日</span>
+    </div>
+  </div>
+
+  <div class="intro-box">
+    この利用規約（以下「本規約」といいます）は、Hotseller Co., Ltd.（以下「当社」といいます）が提供するモバイルアプリケーション「チャデポ（チャージdeポイント）」（以下「本サービス」といいます）の利用条件を定めるものです。本サービスをご利用いただくお客様（以下「ユーザー」といいます）には、本規約に従って本サービスをご利用いただきます。<strong>本サービスの利用を開始した時点で、本規約に同意いただいたものとみなします。</strong>
+  </div>
+
+  <div class="toc">
+    <h2>目次</h2>
+    <ol>
+      <li><a href="#t1">第1条 (適用)</a></li>
+      <li><a href="#t2">第2条 (利用登録)</a></li>
+      <li><a href="#t3">第3条 (アカウントの管理)</a></li>
+      <li><a href="#t4">第4条 (未成年者の利用)</a></li>
+      <li><a href="#t5">第5条 (ポイント・エネルギーについて)</a></li>
+      <li><a href="#t6">第6条 (ギフト交換について)</a></li>
+      <li><a href="#t7">第7条 (招待プログラムに関する特則)</a></li>
+      <li><a href="#t8">第8条 (禁止事項)</a></li>
+      <li><a href="#t9">第9条 (知的財産権)</a></li>
+      <li><a href="#t10">第10条 (本サービスの提供の停止等)</a></li>
+      <li><a href="#t11">第11条 (利用制限および登録抹消)</a></li>
+      <li><a href="#t12">第12条 (退会)</a></li>
+      <li><a href="#t13">第13条 (保証の否認および免責事項)</a></li>
+      <li><a href="#t14">第14条 (サービス内容の変更・終了)</a></li>
+      <li><a href="#t15">第15条 (利用規約の変更)</a></li>
+      <li><a href="#t16">第16条 (準拠法・裁判管轄)</a></li>
+      <li><a href="#t17">お問い合わせ</a></li>
+    </ol>
+  </div>
+
+  <div class="section" id="t1">
+    <h2>第1条（適用）</h2>
+    <p>1. 本規約は、ユーザーと当社との間の本サービスの利用に関わる一切の関係に適用されるものとします。</p>
+    <p>2. 当社は本サービスに関し、本規約のほか、ご利用にあたってのルール等、各種の定め（以下「個別規定」といいます）をすることがあります。これら個別規定はその名称のいかんに関わらず、本規約の一部を構成するものとします。</p>
+    <p>3. 本規約の規定が前項の個別規定の規定と矛盾する場合には、個別規定において特段の定めなき限り、個別規定の規定が優先されるものとします。</p>
+  </div>
+
+  <div class="section" id="t2">
+    <h2>第2条（利用登録）</h2>
+    <p>1. 本サービスにおいては、登録希望者が本規約に同意の上、当社の定める方法によって利用登録を申請し、当社がこれを承認することによって、利用登録が完了するものとします。</p>
+    <p>2. 当社は、利用登録の申請者に以下の事由があると判断した場合、利用登録の申請を承認しないことがあり、その理由については一切の開示義務を負わないものとします。</p>
+    <p>
+      ・ 利用登録の申請に際して虚偽の事項を届け出た場合<br>
+      ・ 本規約に違反したことがある者からの申請である場合<br>
+      ・ 過去に当社によりアカウントを停止・削除された者からの申請である場合<br>
+      ・ その他、当社が利用登録を相当でないと判断した場合
+    </p>
+  </div>
+
+  <div class="section" id="t3">
+    <h2>第3条（アカウントの管理）</h2>
+    <p>1. ユーザーは、自己の責任において、本サービスのアカウント情報を適切に管理するものとします。</p>
+    <p>2. ユーザーは、いかなる場合にも、アカウントを第三者に譲渡または貸与し、もしくは第三者と共用することはできません。</p>
+    <p>3. アカウントが第三者によって使用されたことによって生じた損害は、当社に故意または重大な過失がある場合を除き、当社は一切の責任を負わないものとします。</p>
+    <p>4. 1名につき登録できるアカウントは 1 つに限ります。複数アカウントの作成・保有は禁止します。</p>
+  </div>
+
+  <div class="section" id="t4">
+    <h2>第4条（未成年者の利用）<span class="badge-new">重要</span></h2>
+    <p>1. 本サービスは、原則として 18 歳以上の方を対象としています。</p>
+    <p>2. 18 歳未満のユーザーが本サービスを利用する場合は、保護者（法定代理人）の同意を得た上でご利用ください。保護者の同意なく利用した場合、当社はそれにより生じた一切の損害について責任を負いません。</p>
+    <p>3. 当社は、未成年者のユーザーが保護者の同意なく利用していることが判明した場合、アカウントの停止等の措置をとることがあります。</p>
+  </div>
+
+  <div class="section" id="t5">
+    <h2>第5条（ポイント・エネルギーについて）</h2>
+    <p>1. 本サービスにおいて付与されるポイント（以下「ポイント」といいます）およびエネルギーは、本サービス内でのみ利用できる仮想的な数値であり、現金や有価証券との直接交換はできません。</p>
+
+    <div class="highlight-box">
+      ⚠️ <strong>資金決済法に関する説明：</strong>本サービスのポイントおよびエネルギーは、ユーザーが対価を支払って購入するものではなく、ユーザーの行動（歩く・充電・ゲーム・広告視聴等）に応じて当社が無償で付与するものです。そのため、資金決済法上の「前払式支払手段」には該当しません。
+    </div>
+
+    <p>2. ポイントおよびエネルギーは、ユーザー本人のみが利用でき、第三者への譲渡・売買・換金はできません。</p>
+    <p>3. ポイントおよびエネルギーの付与条件・消費条件・有効期限等は、当社が定めるものとし、当社の判断により予告なく変更されることがあります。</p>
+    <p>4. ユーザーが本サービスを退会した場合、保有するポイントおよびエネルギーはすべて消滅し、当社はその補償を行いません。</p>
+    <p>5. 本サービスが終了する場合、当社は可能な限り事前にユーザーに通知し、ポイント・エネルギーの消費期限を設けた上でサービスを終了します。ただし、緊急の場合はこの限りではありません。</p>
+  </div>
+
+  <div class="section" id="t6">
+    <h2>第6条（ギフト交換について）<span class="badge-new">重要</span></h2>
+    <p>1. ギフト交換は、ご自身の活動（歩く・充電・ゲーム・ミッション・広告視聴等）により貯めたポイントが <strong>1,000P 以上</strong> に到達した場合に限りご利用いただけます。</p>
+    <p>2. お友達紹介により受け取ったポイントは、上記 1,000P の判定対象には含まれません。ただし、ギフト交換時の支払いには通常のポイントと同様に使用できます。</p>
+    <p>3. ギフト交換に必要な最低保有ポイントは商品ごとに異なります（現在の最低額: 5,000P）。</p>
+    <p>4. ギフト交換後のキャンセル・返金はできません。</p>
+    <p>5. Amazonギフトカード等の第三者発行の電子ギフト券を提供する場合、当社は当該ギフト券の利用可否・有効期限・使用条件について責任を負いません。ギフト券に関するお問い合わせは、各発行事業者へ直接ご連絡ください。</p>
+    <p>6. 不正な方法（多重アカウントによるポイント獲得、自動化ツールの使用等）で貯めたポイントによるギフト交換申請は無効となり、付与済みのギフト券の回収・法的措置の対象となることがあります。</p>
+
+    <div class="highlight-box">
+      📌 <strong>景品表示法に関する説明：</strong>本サービスで提供するポイントは、ユーザーが当社サービスを通じて自ら獲得するものであり、購入取引に付随する「景品類」には該当しません。したがって、景品表示法の景品規制の対象外となります。
+    </div>
+  </div>
+
+  <div class="section" id="t7">
+    <h2>第7条（招待プログラムに関する特則）</h2>
+    <p>1. 1名につき 1 アカウントに限ります。</p>
+    <p>2. 同一端末・同一 IP アドレスからの複数アカウント作成、および自己招待（自分で自分を招待すること）は禁止します。</p>
+    <p>3. 招待報酬は、被招待者の登録完了後、当社所定の条件（広告視聴等）を満たした場合に限り、招待者に付与されます。</p>
+    <p>4. エネルギー同伴積立は、被招待者の登録日から 90 日間に限り付与されます。（現在の付与率: 被招待者が獲得したエネルギーの 10%、毎日 JST 03:00 一括付与）</p>
+    <p>5. 不正行為（多重アカウント、エミュレータ利用、VPN 経由の大量登録、招待コード売買等）が判明した場合、ポイントの没収およびアカウントの永久停止の措置をとります。</p>
+    <p>6. 招待報酬および交換条件は、当社の判断により予告なく変更または終了することがあります。</p>
+  </div>
+
+  <div class="section" id="t8">
+    <h2>第8条（禁止事項）</h2>
+    <p>ユーザーは、本サービスの利用にあたり、以下の行為をしてはなりません。</p>
+    <p>
+      1. 法令または公序良俗に違反する行為<br>
+      2. 犯罪行為に関連する行為<br>
+      3. 当社、本サービスの他のユーザー、または第三者のサーバーまたはネットワークの機能を破壊したり、妨害したりする行為<br>
+      4. 当社のサービスの運営を妨害するおそれのある行為<br>
+      5. 不正な目的を持って本サービスを利用する行為<br>
+      6. 自動化ツール（BOT、エミュレータ、マクロ等）を用いてポイントやエネルギーを不正に取得する行為<br>
+      7. VPN・プロキシ等を用いて実際の端末情報や所在地を偽る行為<br>
+      8. 他のユーザーに成りすます行為<br>
+      9. 当社が許諾しない本サービス上での宣伝、広告、勧誘、または営業行為<br>
+      10. 招待コードを金銭・物品と引き換えに売買する行為<br>
+      11. 本サービスのリバースエンジニアリング、逆コンパイル、または解析を行う行為<br>
+      12. その他、当社が不適切と判断する行為
+    </p>
+  </div>
+
+  <div class="section" id="t9">
+    <h2>第9条（知的財産権）<span class="badge-new">新設</span></h2>
+    <p>1. 本サービスおよび本サービスに関連するすべてのコンテンツ（キャラクター、デザイン、テキスト、画像、音声、プログラム等を含みます）に関する著作権その他の知的財産権は、当社または当社に利用を許諾した第三者に帰属します。</p>
+    <p>2. ユーザーは、当社の事前の書面による許可なく、本サービスのコンテンツを複製、転載、改変、販売、または商業目的で使用することはできません。</p>
+    <p>3. ユーザーが本サービスに投稿・送信したコンテンツについて、ユーザーは当社に対し、本サービスの運営・改善に必要な範囲内で、無償・非独占的に使用する権利を付与するものとします。</p>
+  </div>
+
+  <div class="section" id="t10">
+    <h2>第10条（本サービスの提供の停止等）</h2>
+    <p>1. 当社は、以下のいずれかの事由があると判断した場合、ユーザーに事前に通知することなく本サービスの全部または一部の提供を停止または中断することができるものとします。</p>
+    <p>
+      ・ 本サービスにかかるコンピュータシステムの保守点検または更新を行う場合<br>
+      ・ 地震、落雷、火災、停電または天災などの不可抗力により、本サービスの提供が困難となった場合<br>
+      ・ コンピュータまたは通信回線等が事故により停止した場合<br>
+      ・ その他、当社が本サービスの提供が困難と判断した場合
+    </p>
+    <p>2. 当社は、本サービスの提供の停止または中断により、ユーザーまたは第三者が被ったいかなる不利益または損害についても、一切の責任を負わないものとします。</p>
+  </div>
+
+  <div class="section" id="t11">
+    <h2>第11条（利用制限および登録抹消）</h2>
+    <p>1. 当社は、ユーザーが以下のいずれかに該当する場合には、事前の通知なく、ユーザーに対して、本サービスの全部もしくは一部の利用を制限し、またはユーザーとしての登録を抹消することができるものとします。</p>
+    <p>
+      ・ 本規約のいずれかの条項に違反した場合<br>
+      ・ 登録事項に虚偽の事実があることが判明した場合<br>
+      ・ 当社からの連絡に対し、一定期間返答がない場合<br>
+      ・ 本サービスについて、最終の利用から一定期間利用がない場合<br>
+      ・ その他、当社が本サービスの利用を適当でないと判断した場合
+    </p>
+    <p>2. 当社は、本条に基づき当社が行った行為によりユーザーに生じた損害について、一切の責任を負いません。</p>
+  </div>
+
+  <div class="section" id="t12">
+    <h2>第12条（退会）</h2>
+    <p>1. ユーザーは、当社の定める退会手続により、本サービスから退会できるものとします。</p>
+    <p>2. 退会手続は、アプリ内「マイページ」→「アカウント設定」→「退会する」から行うことができます。アプリからの退会が困難な場合は、<a href="mailto:support@chadepo.jp">support@chadepo.jp</a> までご連絡ください。</p>
+    <p>3. 退会後はアカウント情報および当該アカウントに紐づくポイント・エネルギーは消滅し、復元することはできません。</p>
+  </div>
+
+  <div class="section" id="t13">
+    <h2>第13条（保証の否認および免責事項）</h2>
+    <p>1. 当社は、本サービスに事実上または法律上の瑕疵（安全性、信頼性、正確性、完全性、有効性、特定の目的への適合性、セキュリティなどに関する欠陥、エラーやバグ、権利侵害などを含みます）がないことを明示的にも黙示的にも保証しておりません。</p>
+    <p>2. 当社は、本サービスに起因してユーザーに生じたあらゆる損害について、当社の故意または重大な過失による場合を除き、一切の責任を負いません。ただし、本サービスに関する当社とユーザーとの間の契約（本規約を含みます）が消費者契約法に定める消費者契約となる場合、この免責規定は適用されません。</p>
+    <p>3. Amazonギフトカードその他の第三者発行ギフト券・電子マネーについて、当社は当該ギフト券のシステム障害、利用停止、有効期限切れ、使用上の制限等に関していかなる保証も行わず、責任を負いません。</p>
+    <p>4. 当社は、ユーザー間または本サービスを通じてユーザーと第三者との間で生じたトラブルについて、一切の責任を負いません。</p>
+  </div>
+
+  <div class="section" id="t14">
+    <h2>第14条（サービス内容の変更・終了）<span class="badge-new">重要</span></h2>
+    <p>1. 当社は、ユーザーへの事前の告知をもって、本サービスの内容を変更、追加または廃止することがあり、ユーザーはこれを承諾するものとします。</p>
+    <p>2. 本サービスを終了する場合、当社は原則として終了予定日の <strong>30 日前</strong> までにアプリ内またはその他の方法でユーザーに通知します。</p>
+    <p>3. サービス終了の通知後、当社はユーザーが保有するポイントをギフト交換等で消費できる期間を設けます。当該期間終了後に残存するポイント・エネルギーは消滅し、当社は補償を行いません。</p>
+    <p>4. 不可抗力（システム障害、第三者サービスの終了等）により、サービスを即時終了せざるを得ない場合は、この限りではありません。</p>
+  </div>
+
+  <div class="section" id="t15">
+    <h2>第15条（利用規約の変更）</h2>
+    <p>1. 当社は、必要と判断した場合には、ユーザーに通知することなくいつでも本規約を変更することができるものとします。</p>
+    <p>2. 本規約の変更後、本サービスの利用を開始した場合には、当該ユーザーは変更後の規約に同意したものとみなします。</p>
+    <p>3. 重要な変更を行う場合、当社はアプリ内通知その他の方法でユーザーに通知するよう努めます。</p>
+    <p>4. 最新の利用規約は常に本ページ（https://chadepo.jp/terms）に掲載されます。</p>
+  </div>
+
+  <div class="section" id="t16">
+    <h2>第16条（準拠法・裁判管轄）</h2>
+    <p>1. 本規約の解釈にあたっては、日本法を準拠法とします。</p>
+    <p>2. 本サービスに関して紛争が生じた場合には、当社の本店所在地を管轄する裁判所を専属的合意管轄とします。</p>
+  </div>
+
+  <div class="section" id="t17">
+    <h2>お問い合わせ</h2>
+    <div class="contact-box">
+      <h3>サービスに関するお問い合わせ窓口</h3>
+      <p><strong>事業者名：</strong>Hotseller Co., Ltd.</p>
+      <p><strong>メールアドレス：</strong><a href="mailto:support@chadepo.jp">support@chadepo.jp</a></p>
+      <p><strong>受付時間：</strong>平日 10:00〜18:00（日本時間）</p>
+      <p style="margin-top: 12px; font-size: 0.82rem; color: #5a7a9a;">
+        ※ アプリ内「お問い合わせ」からもご連絡いただけます。<br>
+        ※ 個人情報の取り扱いに関するご質問は<a href="/privacy">プライバシーポリシー</a>もご参照ください。
+      </p>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <p>&copy; 2026 Hotseller Co., Ltd. &nbsp;|&nbsp; <a href="/privacy">プライバシーポリシー</a> &nbsp;|&nbsp; <a href="/terms">利用規約</a></p>
+</footer>
+
+</body>
+</html>
