@@ -2,6 +2,7 @@
   "name": "chadepo-web",
   "version": "1.0.0",
   "scripts": {
+    "build": "cd admin-src && npm install && npm run build",
     "start": "serve . -l ${PORT:-3000}"
   },
   "dependencies": {
