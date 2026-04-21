@@ -73,23 +73,40 @@ function ItemModal({ item, onClose }) {
   )
 }
 
+const PAGE = 50
+
 export default function ExchangePage() {
   const qc = useQueryClient()
   const [tab, setTab]       = useState('requests')
   const [editItem, setEditItem] = useState(undefined)
   const [filter, setFilter] = useState('pending')
+  const [page, setPage]     = useState(0)
 
-  const { data: requests } = useQuery({
-    queryKey: ['exchange-requests', filter],
+  const handleFilter = (f) => { setFilter(f); setPage(0) }
+
+  const { data: requests, isLoading: reqLoading } = useQuery({
+    queryKey: ['exchange-requests', filter, page],
     queryFn: async () => {
       let q = supabase
         .from('exchange_requests')
-        .select('*, profiles!user_id(nickname), exchange_items!item_id(title_ja, method)')
+        .select('*, profiles!user_id(nickname), exchange_items!item_id(title_ja, method)', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(100)
+        .range(page * PAGE, (page + 1) * PAGE - 1)
       if (filter !== 'all') q = q.eq('status', filter)
-      const { data } = await q
-      return data ?? []
+      const { data, count } = await q
+      return { rows: data ?? [], total: count ?? 0 }
+    },
+    keepPreviousData: true,
+  })
+
+  const { data: reqSummary } = useQuery({
+    queryKey: ['exchange-summary'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('exchange_requests')
+        .select('status')
+      if (!data) return {}
+      return data.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc }, {})
     },
   })
 
@@ -132,11 +149,14 @@ export default function ExchangePage() {
 
       {tab === 'requests' && (
         <div className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             {[['pending', '대기 중'], ['completed', '처리완료'], ['all', '전체']].map(([v, l]) => (
-              <button key={v} onClick={() => setFilter(v)}
+              <button key={v} onClick={() => handleFilter(v)}
                 className={filter === v ? 'btn-primary text-xs py-1.5 px-3' : 'btn-secondary text-xs py-1.5 px-3'}>{l}</button>
             ))}
+            {requests?.total > 0 && (
+              <span className="ml-auto text-xs text-gray-400">전체 {requests.total.toLocaleString()}건</span>
+            )}
           </div>
           <div className="card p-0 overflow-hidden">
             <table className="w-full text-sm">
@@ -151,7 +171,7 @@ export default function ExchangePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {(requests ?? []).map(r => (
+                {(requests?.rows ?? []).map(r => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString('ko-KR')}</td>
                     <td className="px-4 py-3">
@@ -185,12 +205,21 @@ export default function ExchangePage() {
                     </td>
                   </tr>
                 ))}
-                {(requests ?? []).length === 0 && (
+                {(requests?.rows ?? []).length === 0 && !reqLoading && (
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">신청 내역이 없습니다</td></tr>
                 )}
               </tbody>
             </table>
           </div>
+          {requests?.total > PAGE && (
+            <div className="flex items-center justify-between text-sm text-gray-500 mt-1">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50">← 이전</button>
+              <span>{page + 1} / {Math.ceil(requests.total / PAGE)} 페이지</span>
+              <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * PAGE >= requests.total}
+                className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50">다음 →</button>
+            </div>
+          )}
         </div>
       )}
 

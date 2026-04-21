@@ -15,6 +15,7 @@ export default function FraudPage() {
         .select('id, nickname, points, energy, created_at, signup_ip, social_provider, is_flagged, is_banned')
         .eq('is_flagged', true)
         .order('created_at', { ascending: false })
+        .limit(200)
       return data ?? []
     },
     enabled: tab === 'flagged',
@@ -23,22 +24,24 @@ export default function FraudPage() {
   const { data: duplicateIPs } = useQuery({
     queryKey: ['duplicate-ips'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: ipRows, error } = await supabase.rpc('admin_get_duplicate_ips', { p_min_count: 2, p_limit: 50 })
+      if (error) throw error
+      if (!ipRows?.length) return []
+
+      const ips = ipRows.map(r => r.signup_ip)
+      const { data: users } = await supabase
         .from('profiles')
-        .select('signup_ip, id, nickname, created_at, is_banned, is_flagged')
-        .not('signup_ip', 'is', null)
+        .select('id, nickname, signup_ip, created_at, is_banned, is_flagged')
+        .in('signup_ip', ips)
         .order('signup_ip')
         .limit(500)
-      if (!data) return []
+
       const grouped = {}
-      data.forEach(u => {
+      ;(users ?? []).forEach(u => {
         if (!grouped[u.signup_ip]) grouped[u.signup_ip] = []
         grouped[u.signup_ip].push(u)
       })
-      return Object.entries(grouped)
-        .filter(([, users]) => users.length >= 2)
-        .sort((a, b) => b[1].length - a[1].length)
-        .slice(0, 50)
+      return ipRows.map(r => [r.signup_ip, grouped[r.signup_ip] ?? []])
     },
     enabled: tab === 'ip',
   })

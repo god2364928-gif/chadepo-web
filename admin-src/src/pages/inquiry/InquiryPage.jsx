@@ -150,15 +150,20 @@ function ReplyModal({ inquiry, onClose }) {
   )
 }
 
+const INQ_PAGE = 50
+
 // ─────────────────────────────────────────────
 // 메인 페이지
 // ─────────────────────────────────────────────
 export default function InquiryPage() {
   const [filter, setFilter] = useState('all')
   const [selected, setSelected] = useState(null)
+  const [page, setPage] = useState(0)
 
-  const { data: inquiries = [], isLoading } = useQuery({
-    queryKey: ['inquiries', filter],
+  const handleFilter = (f) => { setFilter(f); setPage(0) }
+
+  const { data: result, isLoading } = useQuery({
+    queryKey: ['inquiries', filter, page],
     queryFn: async () => {
       let q = supabase
         .from('inquiries')
@@ -166,21 +171,37 @@ export default function InquiryPage() {
           *,
           profiles!user_id(nickname),
           reply:inquiry_replies(id, reply_body, created_at)
-        `)
+        `, { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(200)
+        .range(page * INQ_PAGE, (page + 1) * INQ_PAGE - 1)
       if (filter !== 'all') q = q.eq('status', filter)
-      const { data, error } = await q
+      const { data, count, error } = await q
       if (error) throw error
-      return (data ?? []).map(row => ({
-        ...row,
-        reply: Array.isArray(row.reply) ? row.reply[0] ?? null : row.reply,
-      }))
+      return {
+        rows: (data ?? []).map(row => ({
+          ...row,
+          reply: Array.isArray(row.reply) ? row.reply[0] ?? null : row.reply,
+        })),
+        total: count ?? 0,
+      }
+    },
+    keepPreviousData: true,
+  })
+
+  const { data: summary } = useQuery({
+    queryKey: ['inquiry-summary'],
+    queryFn: async () => {
+      const { data } = await supabase.from('inquiries').select('status')
+      if (!data) return { pending: 0, answered: 0 }
+      return {
+        pending:  data.filter(i => i.status === 'pending').length,
+        answered: data.filter(i => i.status === 'answered').length,
+      }
     },
   })
 
-  const pendingCount  = inquiries.filter(i => i.status === 'pending').length
-  const answeredCount = inquiries.filter(i => i.status === 'answered').length
+  const inquiries = result?.rows ?? []
+  const total     = result?.total ?? 0
 
   return (
     <div className="space-y-6">
@@ -189,10 +210,10 @@ export default function InquiryPage() {
         <h1 className="text-2xl font-bold text-gray-900">문의 관리</h1>
         <div className="flex gap-3 text-sm">
           <span className="bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full font-medium">
-            미답변 {pendingCount}건
+            미답변 {summary?.pending ?? 0}건
           </span>
           <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full font-medium">
-            답변완료 {answeredCount}건
+            답변완료 {summary?.answered ?? 0}건
           </span>
         </div>
       </div>
@@ -202,7 +223,7 @@ export default function InquiryPage() {
         {FILTERS.map(({ value, label }) => (
           <button
             key={value}
-            onClick={() => setFilter(value)}
+            onClick={() => handleFilter(value)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
               filter === value
                 ? 'border-brand text-brand'
@@ -212,6 +233,9 @@ export default function InquiryPage() {
             {label}
           </button>
         ))}
+        {total > 0 && (
+          <span className="ml-auto self-center text-xs text-gray-400">전체 {total.toLocaleString()}건</span>
+        )}
       </div>
 
       {/* 목록 */}
@@ -273,6 +297,16 @@ export default function InquiryPage() {
           </table>
         )}
       </div>
+
+      {total > INQ_PAGE && (
+        <div className="flex items-center justify-between text-sm text-gray-500">
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+            className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50">← 이전</button>
+          <span>{page + 1} / {Math.ceil(total / INQ_PAGE)} 페이지</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * INQ_PAGE >= total}
+            className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50">다음 →</button>
+        </div>
+      )}
 
       {selected && (
         <ReplyModal inquiry={selected} onClose={() => setSelected(null)} />

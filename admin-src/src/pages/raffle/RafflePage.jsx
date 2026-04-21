@@ -16,10 +16,13 @@ const statusBadge = (s) => {
 const fmtPrize = (v) =>
   v >= 10000 ? `${(v / 10000).toLocaleString()}만P` : `${v?.toLocaleString()}P`
 
+const ENTRY_PAGE = 100
+
 export default function RafflePage() {
   const qc = useQueryClient()
   const [selectedItemId, setSelectedItemId] = useState(null)
   const [selectedRound, setSelectedRound]   = useState(null)
+  const [entryPage, setEntryPage]           = useState(0)
 
   // 상품 목록 (탭용)
   const { data: items } = useQuery({
@@ -45,6 +48,12 @@ export default function RafflePage() {
   const handleTabChange = (itemId) => {
     setSelectedItemId(itemId)
     setSelectedRound(null)
+    setEntryPage(0)
+  }
+
+  const handleSelectRound = (r) => {
+    setSelectedRound(r)
+    setEntryPage(0)
   }
 
   // 선택 상품의 라운드 목록
@@ -62,20 +71,24 @@ export default function RafflePage() {
     enabled: !!selectedItemId,
   })
 
-  // 선택 라운드의 응모자
-  const { data: entries } = useQuery({
-    queryKey: ['raffle-entries', selectedRound?.id],
+  // 선택 라운드의 응모자 (페이지별)
+  const { data: entriesResult } = useQuery({
+    queryKey: ['raffle-entries', selectedRound?.id, entryPage],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, count, error } = await supabase
         .from('raffle_entries')
-        .select('user_id, entry_count, energy_spent, ad_watched, is_ceiling_win, created_at, profiles!user_id(nickname)')
+        .select('user_id, entry_count, energy_spent, ad_watched, is_ceiling_win, created_at, profiles!user_id(nickname)', { count: 'exact' })
         .eq('round_id', selectedRound.id)
         .order('entry_count', { ascending: false })
+        .range(entryPage * ENTRY_PAGE, (entryPage + 1) * ENTRY_PAGE - 1)
       if (error) throw error
-      return data ?? []
+      return { rows: data ?? [], total: count ?? 0 }
     },
     enabled: !!selectedRound,
+    keepPreviousData: true,
   })
+  const entries      = entriesResult?.rows ?? []
+  const entriesTotal = entriesResult?.total ?? 0
 
   // 선택 라운드의 당첨자
   const { data: winners } = useQuery({
@@ -153,8 +166,8 @@ export default function RafflePage() {
     pickWinner.mutate({ userId, nickname })
   }
 
-  const totalTickets = entries?.reduce((s, e) => s + (e.entry_count ?? 0), 0) ?? 0
-  const uniqueUsers  = entries?.length ?? 0
+  const totalTickets = selectedRound?.current_entries ?? 0
+  const uniqueUsers  = entriesTotal
   const selectedItem = items?.find(i => i.id === selectedItemId)
   const isManualItem = (selectedItem?.prize_value ?? 0) >= MANUAL_DRAW_THRESHOLD
 
@@ -213,7 +226,7 @@ export default function RafflePage() {
               return (
                 <button
                   key={r.id}
-                  onClick={() => setSelectedRound(r)}
+                  onClick={() => handleSelectRound(r)}
                   className={`w-full text-left p-4 rounded-xl border transition-all ${
                     isSelected
                       ? 'border-brand bg-orange-50 shadow-sm'
@@ -361,42 +374,42 @@ export default function RafflePage() {
               {/* 응모자 목록 */}
               <div className="card">
                 <h3 className="font-semibold text-gray-900 mb-3">
-                  응모자 ({uniqueUsers}명 / 티켓 {totalTickets.toLocaleString()}장)
+                  응모자 ({uniqueUsers.toLocaleString()}명 / 티켓 {totalTickets.toLocaleString()}장)
                 </h3>
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-white border-b border-gray-100">
+                    <thead className="bg-gray-50 border-b border-gray-100">
                       <tr className="text-xs text-gray-500">
-                        <th className="text-left pb-2">닉네임</th>
-                        <th className="text-right pb-2">티켓</th>
-                        <th className="text-right pb-2">소비 E</th>
-                        <th className="text-right pb-2">광고</th>
-                        <th className="text-right pb-2">천장</th>
-                        <th className="text-right pb-2">응모일</th>
+                        <th className="text-left pb-2 pt-2 px-1">닉네임</th>
+                        <th className="text-right pb-2 pt-2 px-1">티켓</th>
+                        <th className="text-right pb-2 pt-2 px-1">소비 E</th>
+                        <th className="text-right pb-2 pt-2 px-1">광고</th>
+                        <th className="text-right pb-2 pt-2 px-1">천장</th>
+                        <th className="text-right pb-2 pt-2 px-1">응모일</th>
                         {isManualItem && selectedRound.status === 'active' && (
-                          <th className="text-right pb-2">선택</th>
+                          <th className="text-right pb-2 pt-2 px-1">선택</th>
                         )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {(entries ?? []).map(e => {
+                      {entries.map(e => {
                         const nickname = e.profiles?.nickname || `ユーザー${e.user_id?.slice(0, 4)}`
                         return (
                           <tr key={e.user_id} className="hover:bg-gray-50">
-                            <td className="py-2">
+                            <td className="py-2 px-1">
                               <Link to={`/admin/users/${e.user_id}`} className="text-brand hover:underline text-xs">
                                 {nickname}
                               </Link>
                             </td>
-                            <td className="py-2 text-right font-medium">{e.entry_count?.toLocaleString()}</td>
-                            <td className="py-2 text-right text-gray-500">{e.energy_spent?.toLocaleString()}</td>
-                            <td className="py-2 text-right">{e.ad_watched ? '✅' : '—'}</td>
-                            <td className="py-2 text-right">{e.is_ceiling_win ? '🏆' : '—'}</td>
-                            <td className="py-2 text-right text-gray-400 text-xs">
+                            <td className="py-2 text-right font-medium px-1">{e.entry_count?.toLocaleString()}</td>
+                            <td className="py-2 text-right text-gray-500 px-1">{e.energy_spent?.toLocaleString()}</td>
+                            <td className="py-2 text-right px-1">{e.ad_watched ? '✅' : '—'}</td>
+                            <td className="py-2 text-right px-1">{e.is_ceiling_win ? '🏆' : '—'}</td>
+                            <td className="py-2 text-right text-gray-400 text-xs px-1">
                               {new Date(e.created_at).toLocaleDateString('ko-KR')}
                             </td>
                             {isManualItem && selectedRound.status === 'active' && (
-                              <td className="py-2 text-right">
+                              <td className="py-2 text-right px-1">
                                 <button
                                   onClick={() => handlePickWinner(e.user_id, nickname)}
                                   disabled={pickWinner.isPending}
@@ -409,12 +422,21 @@ export default function RafflePage() {
                           </tr>
                         )
                       })}
-                      {entries?.length === 0 && (
+                      {entries.length === 0 && (
                         <tr><td colSpan={isManualItem ? 7 : 6} className="py-6 text-center text-gray-400 text-xs">응모자 없음</td></tr>
                       )}
                     </tbody>
                   </table>
                 </div>
+                {entriesTotal > ENTRY_PAGE && (
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
+                    <button onClick={() => setEntryPage(p => Math.max(0, p - 1))} disabled={entryPage === 0}
+                      className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-gray-50">← 이전</button>
+                    <span>{entryPage + 1} / {Math.ceil(entriesTotal / ENTRY_PAGE)} 페이지</span>
+                    <button onClick={() => setEntryPage(p => p + 1)} disabled={(entryPage + 1) * ENTRY_PAGE >= entriesTotal}
+                      className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-gray-50">다음 →</button>
+                  </div>
+                )}
               </div>
             </>
           )}
