@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
+const MANUAL_DRAW_THRESHOLD = 1_000_000
+
 const statusBadge = (s) => {
   if (s === 'active')    return <span className="badge-green">진행중</span>
   if (s === 'drawing')   return <span className="badge-blue">추첨중</span>
@@ -113,15 +115,51 @@ export default function RafflePage() {
     onSuccess: () => qc.invalidateQueries(['raffle-winners', selectedRound?.id]),
   })
 
+  const [drawResult, setDrawResult] = useState(null)
+  const [drawError, setDrawError]   = useState('')
+
+  const drawRound = useMutation({
+    mutationFn: async (roundId) => {
+      const { data, error } = await supabase.rpc('admin_draw_raffle_round', { p_round_id: roundId })
+      if (error) throw new Error(error.message)
+      return data?.[0]
+    },
+    onSuccess: (result) => {
+      setDrawResult(result)
+      setDrawError('')
+      qc.invalidateQueries(['raffle-rounds', selectedItemId])
+      qc.invalidateQueries(['raffle-winners', selectedRound?.id])
+    },
+    onError: (err) => {
+      setDrawError(err.message)
+    },
+  })
+
+  const handleDraw = () => {
+    if (!selectedRound) return
+    const ok = window.confirm(
+      `⚠️ 추첨을 실행합니다.\n\n회차: #${selectedRound.round_no}\n응모자: ${entries?.length ?? 0}명\n\n한 번 실행하면 되돌릴 수 없습니다. 진행하시겠습니까?`
+    )
+    if (!ok) return
+    setDrawResult(null)
+    setDrawError('')
+    drawRound.mutate(selectedRound.id)
+  }
+
   const totalTickets = entries?.reduce((s, e) => s + (e.entry_count ?? 0), 0) ?? 0
   const uniqueUsers  = entries?.length ?? 0
   const selectedItem = items?.find(i => i.id === selectedItemId)
+  const isManualItem = (selectedItem?.prize_value ?? 0) >= MANUAL_DRAW_THRESHOLD
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">응모·추첨 관리</h1>
-        <p className="text-gray-500 text-sm mt-1">목표 응모 수 달성 시 자동 추첨됩니다</p>
+        <p className="text-gray-500 text-sm mt-1">
+          {isManualItem
+            ? '100만P 라운드는 어드민이 직접 추첨을 실행합니다'
+            : '목표 응모 수 달성 시 자동 추첨됩니다'}
+        </p>
       </div>
 
       {/* 상품 탭 */}
@@ -242,9 +280,49 @@ export default function RafflePage() {
                     <div className="text-xs text-gray-500 mt-0.5">당첨자 수</div>
                   </div>
                 </div>
-                {selectedRound.status === 'active' && (
+                {selectedRound.status === 'active' && !isManualItem && (
                   <div className="mt-3 p-3 bg-yellow-50 rounded-lg text-xs text-yellow-700">
                     ℹ️ 목표 응모 수({selectedRound.target_entries?.toLocaleString()}명) 달성 시 자동 추첨됩니다
+                  </div>
+                )}
+
+                {/* 수동 추첨 영역 (100만P 전용) */}
+                {isManualItem && selectedRound.status === 'active' && (
+                  <div className="mt-3 p-4 bg-purple-50 rounded-lg border border-purple-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-purple-800">수동 추첨 실행</p>
+                        <p className="text-xs text-purple-600 mt-0.5">
+                          현재 응모자 {uniqueUsers}명 · 티켓 {totalTickets.toLocaleString()}장
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleDraw}
+                        disabled={drawRound.isPending || uniqueUsers === 0}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        {drawRound.isPending ? '추첨 중...' : '🎯 추첨 실행'}
+                      </button>
+                    </div>
+                    {uniqueUsers === 0 && (
+                      <p className="text-xs text-purple-500">응모자가 없어 추첨을 실행할 수 없습니다</p>
+                    )}
+                  </div>
+                )}
+
+                {/* 추첨 결과 표시 */}
+                {drawResult && (
+                  <div className="mt-3 p-4 bg-green-50 rounded-lg border border-green-300">
+                    <p className="text-sm font-semibold text-green-800 mb-1">🎉 추첨 완료!</p>
+                    <p className="text-sm text-green-700">
+                      당첨자: <strong>{drawResult.nickname}</strong> — {drawResult.prize_value?.toLocaleString()} P 지급
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">{drawResult.message}</p>
+                  </div>
+                )}
+                {drawError && (
+                  <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                    <p className="text-xs text-red-700">오류: {drawError}</p>
                   </div>
                 )}
               </div>
