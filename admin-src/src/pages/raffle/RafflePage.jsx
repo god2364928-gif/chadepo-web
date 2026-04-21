@@ -336,7 +336,7 @@ export default function RafflePage() {
                       <div key={w.user_id} className="border border-gray-100 rounded-lg p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <Link to={`/admin/users/${w.user_id}`} className="font-medium text-brand hover:underline">
-                            {w.profiles?.nickname ?? '알 수 없음'}
+                            {w.profiles?.nickname || `ユーザー${w.user_id?.slice(0, 4)}`}
                           </Link>
                           {w.prize_delivered
                             ? <span className="badge-green">포인트 지급완료</span>
@@ -397,7 +397,7 @@ export default function RafflePage() {
                         <tr key={e.user_id} className="hover:bg-gray-50">
                           <td className="py-2">
                             <Link to={`/admin/users/${e.user_id}`} className="text-brand hover:underline text-xs">
-                              {e.profiles?.nickname ?? '알 수 없음'}
+                              {e.profiles?.nickname || `ユーザー${e.user_id?.slice(0, 4)}`}
                             </Link>
                           </td>
                           <td className="py-2 text-right font-medium">{e.entry_count?.toLocaleString()}</td>
