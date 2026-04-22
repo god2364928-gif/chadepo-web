@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 
 const FILTERS = [
@@ -26,6 +26,7 @@ function fmt(dt) {
 
 // ─────────────────────────────────────────────
 // 답변 모달
+// 2026-04-22: inquiry_replies → inquiry_messages 로 마이그레이션
 // ─────────────────────────────────────────────
 function ReplyModal({ inquiry, onClose }) {
   const qc = useQueryClient()
@@ -33,18 +34,28 @@ function ReplyModal({ inquiry, onClose }) {
   const [adminNote, setAdminNote] = useState('')
   const [sending, setSending] = useState(false)
 
+  // 최신 사포트 답변 추출 (서버에서 모든 메시지를 받아 정렬)
+  const supportReply = (inquiry.messages ?? [])
+    .filter(m => m.role === 'support')
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+
   const submit = async () => {
     if (!replyBody.trim()) return
     setSending(true)
-    const { error } = await supabase.from('inquiry_replies').insert({
-      inquiry_id: inquiry.id,
-      reply_body: replyBody.trim(),
+    const { error } = await supabase.from('inquiry_messages').insert({
+      ticket_id:  inquiry.id,
+      role:       'support',
+      content:    replyBody.trim(),
       admin_note: adminNote.trim() || null,
     })
     setSending(false)
     if (!error) {
-      qc.invalidateQueries(['inquiries'])
+      qc.invalidateQueries({ queryKey: ['inquiries'] })
+      qc.invalidateQueries({ queryKey: ['inquiry-summary'] })
       onClose()
+    } else {
+      // eslint-disable-next-line no-alert
+      alert(`답변 전송 실패: ${error.message ?? '알 수 없는 오류'}`)
     }
   }
 
@@ -69,6 +80,15 @@ function ReplyModal({ inquiry, onClose }) {
                 {inquiry.profiles?.nickname ?? `ユーザー${inquiry.user_id?.slice(0, 4)}`}
               </span>
             </div>
+
+            {/* 자동 수집된 사용자 식별 정보 (PR-1 추가) */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs space-y-1.5">
+              <InfoRow label="회원 ID"        value={inquiry.user_id ? `u_${inquiry.user_id.slice(0, 8)}` : '-'} mono />
+              <InfoRow label="連絡先メール"   value={inquiry.email ?? '(미입력)'} mono copyable={!!inquiry.email} />
+              <InfoRow label="端末情報"       value={inquiry.device_info ?? '(미수집 — 旧バージョン)'} />
+              <InfoRow label="アプリバージョン" value={inquiry.app_version ?? '(미수집 — 旧バージョン)'} mono />
+            </div>
+
             <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
               {inquiry.body}
             </div>
@@ -89,13 +109,13 @@ function ReplyModal({ inquiry, onClose }) {
           </div>
 
           {/* 이미 답변한 경우 */}
-          {inquiry.status === 'answered' && inquiry.reply && (
+          {inquiry.status === 'answered' && supportReply && (
             <div className="space-y-1">
               <p className="text-xs font-medium text-green-600">✓ 송신된 답변</p>
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                {inquiry.reply.reply_body}
+                {supportReply.content}
               </div>
-              <p className="text-xs text-gray-400">{fmt(inquiry.reply.created_at)}</p>
+              <p className="text-xs text-gray-400">{fmt(supportReply.created_at)}</p>
             </div>
           )}
 
@@ -150,6 +170,35 @@ function ReplyModal({ inquiry, onClose }) {
   )
 }
 
+// 개별 정보 행 (label + value, 선택적으로 모노스페이스/복사 버튼)
+function InfoRow({ label, value, mono = false, copyable = false }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    } catch {
+      // ignore
+    }
+  }
+  return (
+    <div className="flex items-start gap-2">
+      <span className="w-28 shrink-0 text-gray-500">{label}</span>
+      <span className={`flex-1 text-gray-800 break-all ${mono ? 'font-mono' : ''}`}>{value}</span>
+      {copyable && (
+        <button
+          onClick={handleCopy}
+          className="text-[11px] text-blue-600 hover:underline shrink-0"
+          type="button"
+        >
+          {copied ? '✓ 복사됨' : '복사'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 const INQ_PAGE = 50
 
 // ─────────────────────────────────────────────
@@ -168,9 +217,10 @@ export default function InquiryPage() {
       let q = supabase
         .from('inquiries')
         .select(`
-          *,
+          id, user_id, category, body, status, created_at,
+          email, device_info, app_version, image_urls, priority, is_read_by_user,
           profiles!user_id(nickname),
-          reply:inquiry_replies(id, reply_body, created_at)
+          messages:inquiry_messages(id, ticket_id, role, content, created_at)
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(page * INQ_PAGE, (page + 1) * INQ_PAGE - 1)
@@ -178,10 +228,7 @@ export default function InquiryPage() {
       const { data, count, error } = await q
       if (error) throw error
       return {
-        rows: (data ?? []).map(row => ({
-          ...row,
-          reply: Array.isArray(row.reply) ? row.reply[0] ?? null : row.reply,
-        })),
+        rows: data ?? [],
         total: count ?? 0,
       }
     },
@@ -252,6 +299,7 @@ export default function InquiryPage() {
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">접수일시</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">유저</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">유형</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">단말</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">문의 내용</th>
                 <th className="text-right px-4 py-3 text-gray-500 font-medium">답변</th>
               </tr>
@@ -279,6 +327,9 @@ export default function InquiryPage() {
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${CATEGORY_COLORS[inq.category] ?? 'bg-gray-100 text-gray-600'}`}>
                       {inq.category}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap max-w-[180px] truncate" title={inq.device_info ?? ''}>
+                    {inq.device_info ?? <span className="text-gray-300">-</span>}
                   </td>
                   <td className="px-4 py-3 text-gray-700 max-w-xs">
                     <p className="truncate">{inq.body}</p>
