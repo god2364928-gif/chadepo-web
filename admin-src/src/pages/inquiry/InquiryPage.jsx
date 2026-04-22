@@ -58,8 +58,12 @@ function ReplyModal({ inquiry, onClose }) {
   const feedback = (inquiry.feedback ?? [])[0] ?? null
 
   // 마지막 메시지의 role — '추가 질문' 여부 판단용
+  // PR-2.1: support 답변이 한 번이라도 있어야 "추가 질문"으로 판정.
+  // (CS 미회신 상태에서 사용자가 첫 메시지에 보충 정보를 추가로 보낸
+  //  경우는 "추가 질문"이 아니라 "추가 정보"일 뿐임)
   const lastMsg = messages[messages.length - 1]
-  const hasNewUserMessage = lastMsg?.role === 'user' && messages.length > 1
+  const hasSupportReply = messages.some(m => m.role === 'support')
+  const hasNewUserMessage = lastMsg?.role === 'user' && hasSupportReply
 
   const submit = async () => {
     if (!replyBody.trim()) return
@@ -406,7 +410,9 @@ export default function InquiryPage() {
               {inquiries.map(inq => {
                 const msgCount = (inq.messages?.length ?? 0)
                 const userMsgCount = inq.messages?.filter(m => m.role === 'user').length ?? 0
-                const isReQuestion = inq.status === 'pending' && userMsgCount > 1
+                const supportReplyCount = inq.messages?.filter(m => m.role === 'support').length ?? 0
+                // PR-2.1: support 답변이 1회 이상 있어야 "추가 질문"으로 판정
+                const isReQuestion = inq.status === 'pending' && userMsgCount > 1 && supportReplyCount > 0
                 const fb = inq.feedback?.[0]
                 return (
                   <tr
