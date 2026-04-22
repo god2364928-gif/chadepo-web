@@ -90,12 +90,40 @@ function fmtTime(dt) {
 
 // ─────────────────────────────────────────────
 // 답변 모달 (PR-2: 채팅 형식 + 만족도 표시)
+// PR-2.3: モーダル独自に最新データを再取得し、開いている間はポーリングで
+//         ユーザー側からの追記を即時反映する (stale 対策)。
 // ─────────────────────────────────────────────
-function ReplyModal({ inquiry, onClose }) {
+function ReplyModal({ inquiry: initialInquiry, onClose }) {
   const qc = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
   const [adminNote, setAdminNote] = useState('')
   const [sending, setSending] = useState(false)
+
+  // モーダルを開いている間だけ、対象 inquiry の最新詳細を 5 秒間隔で取得。
+  // 一覧 useQuery のキャッシュとは独立しているため、回答中の追記も漏れない。
+  const { data: freshInquiry } = useQuery({
+    queryKey: ['inquiry-detail', initialInquiry.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inquiries')
+        .select(`
+          id, user_id, category, body, status, created_at,
+          email, device_info, app_version, image_urls, priority, is_read_by_user,
+          profiles!user_id(nickname),
+          messages:inquiry_messages(id, ticket_id, role, content, image_urls, created_at),
+          feedback:inquiry_feedback(rating, feedback_text, created_at)
+        `)
+        .eq('id', initialInquiry.id)
+        .single()
+      if (error) throw error
+      return data
+    },
+    initialData: initialInquiry,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
+  })
+
+  const inquiry = freshInquiry ?? initialInquiry
 
   // 시간순 정렬된 메시지
   const messages = (inquiry.messages ?? [])
@@ -126,6 +154,7 @@ function ReplyModal({ inquiry, onClose }) {
     if (!error) {
       qc.invalidateQueries({ queryKey: ['inquiries'] })
       qc.invalidateQueries({ queryKey: ['inquiry-summary'] })
+      qc.invalidateQueries({ queryKey: ['inquiry-detail', inquiry.id] })
       onClose()
     } else {
       // eslint-disable-next-line no-alert
