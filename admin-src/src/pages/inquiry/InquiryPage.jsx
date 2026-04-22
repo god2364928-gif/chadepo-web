@@ -1,6 +1,54 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+
+const INQUIRY_BUCKET = 'inquiry-attachments'
+
+// PR-2.2 #6: バケットを private 化したため、画像表示時に signedUrl を発行する。
+// path 形式 (例: "<uid>/123_0.png") を受け取り、TTL 1h の URL を返す。
+// 万一 http(s) で始まる legacy データが残っていればそのまま返す。
+function SignedImage({ path, alt, className, openOnClick = false }) {
+  const [url, setUrl] = useState(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!path) { setFailed(true); return }
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      setUrl(path)
+      return
+    }
+    supabase.storage
+      .from(INQUIRY_BUCKET)
+      .createSignedUrl(path, 3600)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error || !data?.signedUrl) {
+          setFailed(true)
+        } else {
+          setUrl(data.signedUrl)
+        }
+      })
+    return () => { cancelled = true }
+  }, [path])
+
+  if (failed) {
+    return (
+      <div className={`${className ?? ''} bg-gray-100 flex items-center justify-center text-gray-400 text-[10px]`}>
+        画像なし
+      </div>
+    )
+  }
+  if (!url) {
+    return (
+      <div className={`${className ?? ''} bg-gray-100 animate-pulse`} />
+    )
+  }
+  const img = <img src={url} alt={alt} className={className} />
+  return openOnClick
+    ? <a href={url} target="_blank" rel="noopener noreferrer">{img}</a>
+    : img
+}
 
 const FILTERS = [
   { value: 'all',      label: '전체' },
@@ -152,10 +200,14 @@ function ReplyModal({ inquiry, onClose }) {
               <div className="pl-2">
                 <p className="text-xs text-gray-400 mb-1">최초 문의 첨부:</p>
                 <div className="flex flex-wrap gap-2">
-                  {inquiry.image_urls.map((url, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                      <img src={url} alt={`添付画像 ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:opacity-80 cursor-zoom-in" />
-                    </a>
+                  {inquiry.image_urls.map((p, i) => (
+                    <SignedImage
+                      key={i}
+                      path={p}
+                      alt={`添付画像 ${i + 1}`}
+                      openOnClick
+                      className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:opacity-80 cursor-zoom-in"
+                    />
                   ))}
                 </div>
               </div>
@@ -235,10 +287,14 @@ function ChatBubble({ role, content, createdAt, imageUrls = [] }) {
           {content}
           {imageUrls?.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
-              {imageUrls.map((url, i) => (
-                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                  <img src={url} alt={`添付画像 ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:opacity-80 cursor-zoom-in" />
-                </a>
+              {imageUrls.map((p, i) => (
+                <SignedImage
+                  key={i}
+                  path={p}
+                  alt={`添付画像 ${i + 1}`}
+                  openOnClick
+                  className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:opacity-80 cursor-zoom-in"
+                />
               ))}
             </div>
           )}
