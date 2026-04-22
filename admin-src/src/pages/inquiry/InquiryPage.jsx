@@ -17,6 +17,15 @@ const CATEGORY_COLORS = {
   'その他':                            'bg-gray-100 text-gray-600',
 }
 
+// 不満理由コード → 表示ラベル (앱과 동일하게 유지)
+const NEGATIVE_REASON_LABELS = {
+  hard_to_understand: '理解しづらい',
+  not_resolved:       '問題が解決しない',
+  slow_response:      '応答が遅い',
+  off_topic:          '質問の意図と違う',
+  other:              'その他',
+}
+
 function fmt(dt) {
   return new Date(dt).toLocaleString('ja-JP', {
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -24,9 +33,15 @@ function fmt(dt) {
   })
 }
 
+function fmtTime(dt) {
+  return new Date(dt).toLocaleString('ja-JP', {
+    month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 // ─────────────────────────────────────────────
-// 답변 모달
-// 2026-04-22: inquiry_replies → inquiry_messages 로 마이그레이션
+// 답변 모달 (PR-2: 채팅 형식 + 만족도 표시)
 // ─────────────────────────────────────────────
 function ReplyModal({ inquiry, onClose }) {
   const qc = useQueryClient()
@@ -34,10 +49,17 @@ function ReplyModal({ inquiry, onClose }) {
   const [adminNote, setAdminNote] = useState('')
   const [sending, setSending] = useState(false)
 
-  // 최신 사포트 답변 추출 (서버에서 모든 메시지를 받아 정렬)
-  const supportReply = (inquiry.messages ?? [])
-    .filter(m => m.role === 'support')
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+  // 시간순 정렬된 메시지
+  const messages = (inquiry.messages ?? [])
+    .slice()
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+
+  // 만족도 (0건 또는 1건)
+  const feedback = (inquiry.feedback ?? [])[0] ?? null
+
+  // 마지막 메시지의 role — '추가 질문' 여부 판단용
+  const lastMsg = messages[messages.length - 1]
+  const hasNewUserMessage = lastMsg?.role === 'user' && messages.length > 1
 
   const submit = async () => {
     if (!replyBody.trim()) return
@@ -64,12 +86,21 @@ function ReplyModal({ inquiry, onClose }) {
       <div className="bg-white rounded-xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh]">
         {/* 헤더 */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">문의 답변</h3>
+          <div>
+            <h3 className="font-semibold text-gray-900">
+              문의 답변
+              {hasNewUserMessage && inquiry.status === 'pending' && (
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                  추가 질문
+                </span>
+              )}
+            </h3>
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
 
         <div className="overflow-y-auto flex-1 p-6 space-y-5">
-          {/* 문의 정보 */}
+          {/* 메타 정보 */}
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[inquiry.category] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -81,7 +112,7 @@ function ReplyModal({ inquiry, onClose }) {
               </span>
             </div>
 
-            {/* 자동 수집된 사용자 식별 정보 (PR-1 추가) */}
+            {/* 자동 수집된 사용자 식별 정보 (PR-1) */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs space-y-1.5">
               <InfoRow label="회원 ID"        value={inquiry.user_id ? `u_${inquiry.user_id.slice(0, 8)}` : '-'} mono />
               <InfoRow label="連絡先メール"   value={inquiry.email ?? '(미입력)'} mono copyable={!!inquiry.email} />
@@ -89,46 +120,54 @@ function ReplyModal({ inquiry, onClose }) {
               <InfoRow label="アプリバージョン" value={inquiry.app_version ?? '(미수집 — 旧バージョン)'} mono />
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-              {inquiry.body}
-            </div>
-            {/* 첨부 이미지 */}
-            {inquiry.image_urls?.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {inquiry.image_urls.map((url, i) => (
-                  <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src={url}
-                      alt={`添付画像 ${i + 1}`}
-                      className="w-24 h-24 object-cover rounded-lg border border-gray-200 hover:opacity-80 transition-opacity cursor-zoom-in"
-                    />
-                  </a>
-                ))}
+            {/* 만족도 표시 (PR-2) */}
+            {feedback && (
+              <FeedbackBadge feedback={feedback} />
+            )}
+          </div>
+
+          {/* 채팅 형식 메시지 스레드 (PR-2) */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">대화 내역 ({messages.length}건)</p>
+            {messages.length === 0 ? (
+              // 폴백: messages가 비어있으면 inquiry.body를 표시
+              <ChatBubble role="user" content={inquiry.body} createdAt={inquiry.created_at} imageUrls={inquiry.image_urls} />
+            ) : (
+              messages.map((m) => (
+                <ChatBubble
+                  key={m.id}
+                  role={m.role}
+                  content={m.content}
+                  createdAt={m.created_at}
+                  imageUrls={m.image_urls}
+                />
+              ))
+            )}
+            {/* 첨부 이미지가 inquiry 차원에 있고 messages는 텍스트만 있는 경우 보강 */}
+            {messages.length > 0 && (inquiry.image_urls?.length ?? 0) > 0 && !messages.some(m => (m.image_urls?.length ?? 0) > 0) && (
+              <div className="pl-2">
+                <p className="text-xs text-gray-400 mb-1">최초 문의 첨부:</p>
+                <div className="flex flex-wrap gap-2">
+                  {inquiry.image_urls.map((url, i) => (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                      <img src={url} alt={`添付画像 ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:opacity-80 cursor-zoom-in" />
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </div>
 
-          {/* 이미 답변한 경우 */}
-          {inquiry.status === 'answered' && supportReply && (
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-green-600">✓ 송신된 답변</p>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                {supportReply.content}
-              </div>
-              <p className="text-xs text-gray-400">{fmt(supportReply.created_at)}</p>
-            </div>
-          )}
-
-          {/* 답변 입력 (미답변인 경우만) */}
+          {/* 답변 입력 (미답변 또는 추가질문 들어온 경우) */}
           {inquiry.status === 'pending' && (
-            <div className="space-y-3">
+            <div className="space-y-3 border-t border-gray-100 pt-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   답변 내용 <span className="text-red-500">*</span>
                   <span className="text-gray-400 font-normal ml-1">(사용자에게 표시)</span>
                 </label>
                 <textarea
-                  rows={7}
+                  rows={6}
                   value={replyBody}
                   onChange={e => setReplyBody(e.target.value)}
                   placeholder="사용자에게 전달할 답변을 입력하세요..."
@@ -141,7 +180,7 @@ function ReplyModal({ inquiry, onClose }) {
                   <span className="text-gray-400 font-normal ml-1">(사용자 비표시)</span>
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={adminNote}
                   onChange={e => setAdminNote(e.target.value)}
                   placeholder="대응 이력, 참고사항 등 (선택)"
@@ -161,11 +200,68 @@ function ReplyModal({ inquiry, onClose }) {
               disabled={!replyBody.trim() || sending}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {sending ? '전송 중...' : '답변 전송'}
+              {sending ? '전송 중...' : (hasNewUserMessage ? '추가 답변 전송' : '답변 전송')}
             </button>
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 채팅 말풍선 (user / support)
+// ─────────────────────────────────────────────
+function ChatBubble({ role, content, createdAt, imageUrls = [] }) {
+  const isUser = role === 'user'
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[85%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
+        <div className="flex items-center gap-1.5 mb-1 text-[11px] text-gray-400">
+          <span className={`font-medium ${isUser ? 'text-blue-600' : 'text-green-600'}`}>
+            {isUser ? '🧑‍💼 사용자' : '🛟 사포트 답변'}
+          </span>
+          <span>{fmtTime(createdAt)}</span>
+        </div>
+        <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+          isUser
+            ? 'bg-blue-50 text-gray-800 border border-blue-100'
+            : 'bg-green-50 text-gray-800 border border-green-100'
+        }`}>
+          {content}
+          {imageUrls?.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {imageUrls.map((url, i) => (
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                  <img src={url} alt={`添付画像 ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:opacity-80 cursor-zoom-in" />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// 만족도 배지 (모달 안)
+// ─────────────────────────────────────────────
+function FeedbackBadge({ feedback }) {
+  const isPos = feedback.rating === 'positive'
+  const reason = feedback.feedback_text ? (NEGATIVE_REASON_LABELS[feedback.feedback_text] ?? feedback.feedback_text) : null
+  return (
+    <div className={`rounded-lg p-3 text-sm flex items-center gap-2 border ${
+      isPos
+        ? 'bg-green-50 border-green-200 text-green-800'
+        : 'bg-red-50 border-red-200 text-red-800'
+    }`}>
+      <span className="text-lg">{isPos ? '👍' : '👎'}</span>
+      <div className="flex-1">
+        <span className="font-medium">{isPos ? '解決した' : '不満'}</span>
+        {reason && <span className="ml-2 text-xs opacity-80">理由: {reason}</span>}
+      </div>
+      <span className="text-xs opacity-60">{fmt(feedback.created_at)}</span>
     </div>
   )
 }
@@ -220,7 +316,8 @@ export default function InquiryPage() {
           id, user_id, category, body, status, created_at,
           email, device_info, app_version, image_urls, priority, is_read_by_user,
           profiles!user_id(nickname),
-          messages:inquiry_messages(id, ticket_id, role, content, created_at)
+          messages:inquiry_messages(id, ticket_id, role, content, image_urls, created_at),
+          feedback:inquiry_feedback(rating, feedback_text, created_at)
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(page * INQ_PAGE, (page + 1) * INQ_PAGE - 1)
@@ -296,54 +393,79 @@ export default function InquiryPage() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">상태</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">평가</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">접수일시</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">유저</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">유형</th>
                 <th className="text-left px-4 py-3 text-gray-500 font-medium">단말</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">문의 내용</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">대화</th>
                 <th className="text-right px-4 py-3 text-gray-500 font-medium">답변</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {inquiries.map(inq => (
-                <tr
-                  key={inq.id}
-                  className={`hover:bg-gray-50 transition-colors ${inq.status === 'pending' ? 'bg-yellow-50/30' : ''}`}
-                >
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {inq.status === 'pending' ? (
-                      <span className="badge-yellow">미답변</span>
-                    ) : (
-                      <span className="badge-green">완료</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
-                    {fmt(inq.created_at)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                    {inq.profiles?.nickname ?? `ユーザー${inq.user_id?.slice(0, 4)}`}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${CATEGORY_COLORS[inq.category] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {inq.category}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap max-w-[180px] truncate" title={inq.device_info ?? ''}>
-                    {inq.device_info ?? <span className="text-gray-300">-</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 max-w-xs">
-                    <p className="truncate">{inq.body}</p>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => setSelected(inq)}
-                      className={inq.status === 'pending' ? 'btn-primary text-xs py-1.5 px-3' : 'btn-secondary text-xs py-1.5 px-3'}
-                    >
-                      {inq.status === 'pending' ? '답변하기' : '내용 보기'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {inquiries.map(inq => {
+                const msgCount = (inq.messages?.length ?? 0)
+                const userMsgCount = inq.messages?.filter(m => m.role === 'user').length ?? 0
+                const isReQuestion = inq.status === 'pending' && userMsgCount > 1
+                const fb = inq.feedback?.[0]
+                return (
+                  <tr
+                    key={inq.id}
+                    className={`hover:bg-gray-50 transition-colors ${
+                      isReQuestion ? 'bg-orange-50/40' : (inq.status === 'pending' ? 'bg-yellow-50/30' : '')
+                    }`}
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {inq.status === 'pending' ? (
+                        isReQuestion ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">추가 질문</span>
+                        ) : (
+                          <span className="badge-yellow">미답변</span>
+                        )
+                      ) : (
+                        <span className="badge-green">완료</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                      {fb ? (
+                        <span title={fb.feedback_text ? (NEGATIVE_REASON_LABELS[fb.feedback_text] ?? fb.feedback_text) : ''} className="text-base">
+                          {fb.rating === 'positive' ? '👍' : '👎'}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                      {fmt(inq.created_at)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      {inq.profiles?.nickname ?? `ユーザー${inq.user_id?.slice(0, 4)}`}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${CATEGORY_COLORS[inq.category] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {inq.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap max-w-[180px] truncate" title={inq.device_info ?? ''}>
+                      {inq.device_info ?? <span className="text-gray-300">-</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 max-w-xs">
+                      <p className="truncate">{inq.body}</p>
+                      {msgCount > 1 && (
+                        <p className="text-[11px] text-gray-400 mt-0.5">+{msgCount - 1}개 메시지</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => setSelected(inq)}
+                        className={inq.status === 'pending' ? 'btn-primary text-xs py-1.5 px-3' : 'btn-secondary text-xs py-1.5 px-3'}
+                      >
+                        {inq.status === 'pending' ? '답변하기' : '내용 보기'}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
