@@ -221,11 +221,15 @@ export default function RafflePage() {
   }
 
   const totalTickets  = selectedRound?.current_entries ?? 0
+  const targetEntries = selectedRound?.target_entries  ?? 0
   const uniqueUsers   = entriesTotal
   const selectedItem  = items?.find(i => i.id === selectedItemId)
   const isManualItem  = (selectedItem?.prize_value ?? 0) >= MANUAL_DRAW_THRESHOLD
+  const targetReached = targetEntries > 0 && totalTickets >= targetEntries
   const canPickWinner = isManualItem && selectedRound?.status === 'drawing'
-  const canStartDraw  = isManualItem && selectedRound?.status === 'active'
+  // 「추첨 시작」 버튼은 목표 응모 수 달성 시에만 노출 (DB RPC 도 동일 가드 보유)
+  const canStartDraw  = isManualItem && selectedRound?.status === 'active' && targetReached
+  const showTargetWaiting = isManualItem && selectedRound?.status === 'active' && !targetReached
 
   return (
     <div className="space-y-4">
@@ -368,14 +372,28 @@ export default function RafflePage() {
                   </div>
                 )}
 
-                {/* 100만P: 진행중 → 추첨 시작 */}
+                {/* 100만P: 목표 미달 (응모 접수 중) */}
+                {showTargetWaiting && (
+                  <div className="mt-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <p className="text-sm font-semibold text-amber-800">⏳ 응모 접수중 — 목표 미달</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      현재 티켓 {totalTickets.toLocaleString()}장 / 목표 {targetEntries.toLocaleString()}장
+                      &nbsp;(<span className="font-semibold">{(targetEntries - totalTickets).toLocaleString()}장 남음</span>)
+                    </p>
+                    <p className="text-[11px] text-amber-600 mt-1.5">
+                      목표 응모 수에 도달해야 「추첨 시작」 버튼이 활성화됩니다.
+                    </p>
+                  </div>
+                )}
+
+                {/* 100만P: 목표 달성 → 추첨 시작 가능 */}
                 {canStartDraw && (
                   <div className="mt-3 p-4 bg-purple-50 rounded-lg border border-purple-200">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-purple-800">📥 응모 접수중</p>
+                        <p className="text-sm font-semibold text-purple-800">🎯 목표 응모 수 달성</p>
                         <p className="text-xs text-purple-600 mt-0.5">
-                          현재 {uniqueUsers.toLocaleString()}명 · 티켓 {totalTickets.toLocaleString()}장
+                          현재 {uniqueUsers.toLocaleString()}명 · 티켓 {totalTickets.toLocaleString()}장 (목표 {targetEntries.toLocaleString()}장)
                         </p>
                         <p className="text-[11px] text-purple-500 mt-1">
                           추첨을 시작하면 응모 접수가 종료되고, 당첨자를 직접 선택할 수 있는 단계로 넘어갑니다.
