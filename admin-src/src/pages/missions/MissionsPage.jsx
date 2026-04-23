@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import GameTimeStats from './GameTimeStats'
 
 // ── 6개 퀘스트 정의 (앱 코드 기준) ──
 const QUESTS = [
@@ -219,6 +220,7 @@ export default function MissionsPage() {
     { id: 'quest', label: '오늘 퀘스트' },
     { id: 'game',  label: '오늘 게임' },
     { id: 'box',   label: '퀘스트 박스' },
+    { id: 'time',  label: '⏱️ 게임 완료시간 통계' },
   ]
 
   return (
@@ -228,7 +230,7 @@ export default function MissionsPage() {
           <h1 className="text-2xl font-bold text-gray-900">게임·미션 관리</h1>
           <p className="text-sm text-gray-500 mt-1">앱 "あそぶ" 기준 — 퀘스트 6종 / 게임 15종 / 퀘스트 박스</p>
         </div>
-        <DatePicker value={date} onChange={handleDate} />
+        {tab !== 'time' && <DatePicker value={date} onChange={handleDate} />}
       </div>
 
       {/* 탭 */}
@@ -499,6 +501,9 @@ export default function MissionsPage() {
           )}
         </div>
       )}
+
+      {/* ── ⏱️ 게임 완료시간 통계 탭 ── */}
+      {tab === 'time' && <GameTimeStats />}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useState } from 'react'
+import GameAbuseLog from './GameAbuseLog'
 
 export default function FraudPage() {
   const qc = useQueryClient()
@@ -82,6 +83,7 @@ export default function FraudPage() {
     { key: 'flagged', label: `🚨 의심 유저 (${flagged?.length ?? '…'})` },
     { key: 'ip', label: '🔍 중복 IP 탐지' },
     { key: 'balance', label: '💰 고액 보유자' },
+    { key: 'game_abuse', label: '🎮 게임 어뷰징 로그' },
   ]
 
   return (
@@ -171,6 +173,9 @@ export default function FraudPage() {
           )}
         </div>
       )}
+
+      {/* 게임 어뷰징 로그 탭 */}
+      {tab === 'game_abuse' && <GameAbuseLog />}
 
       {/* 고액 보유자 탭 */}
       {tab === 'balance' && (
