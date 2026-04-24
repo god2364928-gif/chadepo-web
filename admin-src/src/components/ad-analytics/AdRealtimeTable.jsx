@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { formatJstDateTime, formatUsd } from '../../utils/jstFormat'
 
@@ -86,6 +87,7 @@ export default function AdRealtimeTable({ refreshKey: parentRefreshKey }) {
               <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
                 <tr>
                   <th className="text-left  px-4 py-3 font-medium">시각 (JST)</th>
+                  <th className="text-left  px-4 py-3 font-medium">유저</th>
                   <th className="text-left  px-4 py-3 font-medium">타입</th>
                   <th className="text-left  px-4 py-3 font-medium">포맷</th>
                   <th className="text-left  px-4 py-3 font-medium">화면</th>
@@ -108,6 +110,19 @@ export default function AdRealtimeTable({ refreshKey: parentRefreshKey }) {
                     <tr key={i} className={rowCls}>
                       <td className="px-4 py-2 text-xs text-gray-600 whitespace-nowrap">
                         {formatJstDateTime(r.created_at)}
+                      </td>
+                      <td className="px-4 py-2 text-xs">
+                        {r.user_id ? (
+                          <Link
+                            to={`/admin/users/${r.user_id}`}
+                            className="text-brand hover:underline"
+                            title={r.user_id}
+                          >
+                            {r.nickname ?? '—'}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-2">
                         <span className={`text-[11px] px-1.5 py-0.5 rounded ${e.cls}`}>{e.ja}</span>
@@ -132,7 +147,7 @@ export default function AdRealtimeTable({ refreshKey: parentRefreshKey }) {
                 })}
                 {(!data || data.length === 0) && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-xs">
+                    <td colSpan={8} className="px-4 py-8 text-center text-gray-400 text-xs">
                       이벤트가 없습니다
                     </td>
                   </tr>
