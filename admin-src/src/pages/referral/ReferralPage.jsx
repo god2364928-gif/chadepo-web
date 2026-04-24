@@ -54,10 +54,11 @@ export default function ReferralPage() {
   })
 
   const statusBadge = (s) => {
-    if (s === 'rewarded') return <span className="badge-green">보상완료</span>
-    if (s === 'pending')  return <span className="badge-yellow">대기중</span>
-    if (s === 'flagged')  return <span className="badge-red">의심</span>
-    if (s === 'expired')  return <span className="badge-gray">만료</span>
+    if (s === 'rewarded')         return <span className="badge-green">보상완료</span>
+    if (s === 'pending')          return <span className="badge-yellow">대기중</span>
+    if (s === 'reward_available') return <span className="badge-yellow">받기대기</span>
+    if (s === 'flagged')          return <span className="badge-red">의심</span>
+    if (s === 'expired')          return <span className="badge-gray">만료</span>
     return <span className="badge-gray">{s}</span>
   }
 
@@ -71,9 +72,9 @@ export default function ReferralPage() {
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: '전체 초대', value: (summary?.rewarded ?? 0) + (summary?.pending ?? 0) + (summary?.flagged ?? 0) + (summary?.expired ?? 0), color: 'bg-white' },
+          { label: '전체 초대', value: (summary?.rewarded ?? 0) + (summary?.pending ?? 0) + (summary?.reward_available ?? 0) + (summary?.flagged ?? 0) + (summary?.expired ?? 0), color: 'bg-white' },
           { label: '보상 완료', value: summary?.rewarded ?? 0, color: 'bg-green-50' },
-          { label: '대기 중',   value: summary?.pending ?? 0,  color: 'bg-yellow-50' },
+          { label: '대기 중',   value: (summary?.pending ?? 0) + (summary?.reward_available ?? 0), color: 'bg-yellow-50' },
           { label: '의심 건',   value: summary?.flagged ?? 0,  color: 'bg-red-50' },
         ].map(({ label, value, color }) => (
           <div key={label} className={`${color} rounded-xl border border-gray-200 p-4`}>
@@ -87,7 +88,7 @@ export default function ReferralPage() {
         {/* 초대 이벤트 목록 */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
-            {[['all', '전체'], ['pending', '대기중'], ['rewarded', '완료'], ['flagged', '의심'], ['expired', '만료']].map(([v, l]) => (
+            {[['all', '전체'], ['pending', '대기중'], ['reward_available', '받기대기'], ['rewarded', '완료'], ['flagged', '의심'], ['expired', '만료']].map(([v, l]) => (
               <button key={v} onClick={() => handleFilter(v)}
                 className={filter === v ? 'btn-primary text-xs py-1.5 px-3' : 'btn-secondary text-xs py-1.5 px-3'}>{l}</button>
             ))}
@@ -125,7 +126,7 @@ export default function ReferralPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-xs">
                       {e.referrer_bonus_granted
-                        ? <span className="text-green-600 font-medium">+{e.referrer_bonus_amount ?? 0} E</span>
+                        ? <span className="text-green-600 font-medium">+{e.referrer_bonus_amount ?? 0} P</span>
                         : <span className="text-gray-400">미지급</span>}
                     </td>
                     <td className="px-4 py-3 text-right text-xs">

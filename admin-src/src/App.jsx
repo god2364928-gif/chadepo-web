@@ -11,6 +11,7 @@ import FraudPage from './pages/fraud/FraudPage'
 import MissionsPage from './pages/missions/MissionsPage'
 import ReferralPage from './pages/referral/ReferralPage'
 import InquiryPage from './pages/inquiry/InquiryPage'
+import AdAnalyticsPage from './pages/ads/AdAnalyticsPage'
 
 function ProtectedRoute({ children }) {
   const { user, isAdmin, loading } = useAuth()
@@ -41,6 +42,7 @@ export default function App() {
                 <Route path="missions" element={<MissionsPage />} />
                 <Route path="referral" element={<ReferralPage />} />
                 <Route path="inquiry" element={<InquiryPage />} />
+                <Route path="ads" element={<AdAnalyticsPage />} />
                 <Route path="*" element={<Navigate to="/admin" replace />} />
               </Routes>
             </Layout>
