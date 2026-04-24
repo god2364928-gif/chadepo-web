@@ -474,7 +474,7 @@ export default function InquiryPage() {
       {/* 목록 */}
       <div className="card p-0 overflow-hidden">
         {isLoading ? (
-          <div className="py-16 text-center text-gray-400 text-sm">로딩 중...</div>
+          <div className="py-16 text-center text-gray-400 text-sm">読み込み中...</div>
         ) : inquiries.length === 0 ? (
           <div className="py-16 text-center text-gray-400 text-sm">문의가 없습니다</div>
         ) : (

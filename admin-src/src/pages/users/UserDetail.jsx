@@ -167,7 +167,7 @@ export default function UserDetail() {
     onSuccess: () => qc.invalidateQueries(['user', id]),
   })
 
-  if (isLoading) return <div className="text-gray-400 text-sm">로딩 중...</div>
+  if (isLoading) return <div className="text-gray-400 text-sm">読み込み中...</div>
   if (!user) return <div className="text-red-500">유저를 찾을 수 없습니다.</div>
 
   const tabs = [
