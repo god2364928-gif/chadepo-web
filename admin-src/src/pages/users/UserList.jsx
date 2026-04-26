@@ -6,13 +6,15 @@ import { supabase } from '../../lib/supabase'
 const PAGE = 50
 
 const fmtDate = (ts) => {
-  if (!ts) return '—'
+  if (!ts) return '-'
   const d = new Date(ts)
   return d.toLocaleString('ko-KR', {
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: false,
   })
 }
+
+const getLastAccessAt = (user) => user.last_seen_at ?? user.updated_at ?? null
 
 const SORT_COLS = {
   created_at:   { label: '가입일',     asc: false },
@@ -43,7 +45,7 @@ export default function UserList() {
     queryFn: async () => {
       let q = supabase
         .from('profiles')
-        .select('id, nickname, points, energy, is_flagged, is_banned, created_at, last_seen_at, social_provider, referral_code', { count: 'exact' })
+        .select('id, nickname, points, energy, is_flagged, is_banned, created_at, updated_at, last_seen_at, social_provider, referral_code', { count: 'exact' })
         .order(sortCol, { ascending: sortAsc })
         .range(page * PAGE, (page + 1) * PAGE - 1)
 
@@ -66,7 +68,7 @@ export default function UserList() {
     return (
       <button
         onClick={() => handleSort(col)}
-        className={`flex items-center gap-1 hover:text-gray-800 transition-colors ${active ? 'text-brand font-semibold' : 'text-gray-500 font-medium'}`}
+        className={`inline-flex w-full items-center justify-end gap-1 whitespace-nowrap hover:text-gray-800 transition-colors ${active ? 'text-brand font-semibold' : 'text-gray-500 font-medium'}`}
       >
         {label}
         <span className="text-xs">{active ? (sortAsc ? '↑' : '↓') : '↕'}</span>
@@ -155,17 +157,17 @@ export default function UserList() {
                       <td className="px-4 py-3">
                         <span className="badge-gray">{u.social_provider ?? '—'}</span>
                       </td>
-                      <td className="px-4 py-3 text-right text-blue-600 font-medium">
+                      <td className="px-4 py-3 text-right text-blue-600 font-medium tabular-nums whitespace-nowrap">
                         {u.energy?.toLocaleString()} E
                       </td>
-                      <td className="px-4 py-3 text-right text-brand font-medium">
+                      <td className="px-4 py-3 text-right text-brand font-medium tabular-nums whitespace-nowrap">
                         {u.points?.toLocaleString()} P
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-400 text-xs whitespace-nowrap">
+                      <td className="px-4 py-3 text-right text-gray-400 text-xs tabular-nums whitespace-nowrap">
                         {fmtDate(u.created_at)}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-400 text-xs whitespace-nowrap">
-                        {fmtDate(u.last_seen_at)}
+                      <td className="px-4 py-3 text-right text-gray-400 text-xs tabular-nums whitespace-nowrap">
+                        {fmtDate(getLastAccessAt(u))}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {u.is_banned
