@@ -4,9 +4,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 // 100P (prize_value <= AUTO_DRAW_MAX_PRIZE) 만 자동 추첨, 그 외는 어드민 직접 지정
+// 모든 수동 추첨 상품(5천/1만/100万)은 「당첨 지정 → 지급 완료 처리」 2단계로 통일
 const AUTO_DRAW_MAX_PRIZE = 100
-// 잭팟 (>= JACKPOT_PRIZE) 은 「지급 완료 처리」 수동 단계 유지 (큰 금액)
-const JACKPOT_PRIZE = 1_000_000
 
 const statusBadge = (s) => {
   if (s === 'active')    return <span className="badge-green">진행중</span>
@@ -184,8 +183,8 @@ export default function RafflePage() {
   }
 
   // 어드민 당첨자 지정 RPC.
-  // - 5천/1만 P: 포인트 자동 지급 + prize_delivered=true
-  // - 100万P:    prize_delivered=false 로 등록 → 「지급 완료 처리」 수동 클릭 (종전과 동일)
+  // - 모든 수동 추첨 상품(5천/1만/100万): prize_delivered=false 로 등록만 수행
+  //   → 어드민이 별도 「지급 완료 처리」 클릭 시 포인트 지급
   // - 100P 회차는 자동 추첨 대상이라 RPC 자체가 거부함
   const pickWinner = useMutation({
     mutationFn: async ({ userId, nickname }) => {
@@ -205,13 +204,14 @@ export default function RafflePage() {
   })
 
   const handlePickWinner = (userId, nickname) => {
-    const isJackpotItem  = (selectedItem?.prize_value ?? 0) >= JACKPOT_PRIZE
-    const prizeLabel     = selectedItem?.title_ja ?? '상품'
-    const creditNotice   = isJackpotItem
-      ? `\n\n※ ${prizeLabel} 는 지정 후 「지급 완료 처리」 수동 단계가 별도 필요합니다.`
-      : `\n\n※ 지정 즉시 ${prizeLabel} 포인트가 자동 지급됩니다.`
+    const prizeLabel = selectedItem?.title_ja ?? '상품'
     const ok = window.confirm(
-      `⚠️ 당첨자로 지정합니다.\n\n당첨자: ${nickname}\n회차: #${selectedRound.round_no}${creditNotice}\n\n한 번 지정하면 되돌릴 수 없습니다. 진행하시겠습니까?`
+      `⚠️ 당첨자로 지정합니다.\n\n` +
+      `당첨자: ${nickname}\n` +
+      `회차: #${selectedRound.round_no}\n` +
+      `상품: ${prizeLabel}\n\n` +
+      `※ 지정 후 별도 「지급 완료 처리」 클릭 시점에 포인트가 지급됩니다.\n` +
+      `한 번 지정하면 되돌릴 수 없습니다. 진행하시겠습니까?`
     )
     if (!ok) return
     setPickError('')
@@ -223,9 +223,8 @@ export default function RafflePage() {
   const uniqueUsers   = entriesTotal
   const selectedItem  = items?.find(i => i.id === selectedItemId)
   const prizeValue    = selectedItem?.prize_value ?? 0
-  // 100P 만 자동 추첨, 그 외(5천/1만/100万)는 어드민 직접 지정
+  // 100P 만 자동 추첨, 그 외(5천/1만/100万)는 어드민 직접 지정 + 「지급 완료 처리」 수동
   const isManualItem  = prizeValue > AUTO_DRAW_MAX_PRIZE
-  const isJackpotItem = prizeValue >= JACKPOT_PRIZE
   const targetReached = targetEntries > 0 && totalTickets >= targetEntries
   const canPickWinner = isManualItem && selectedRound?.status === 'drawing'
   // 통상은 응모 목표 도달 시 자동으로 drawing 으로 전환되므로
@@ -239,9 +238,7 @@ export default function RafflePage() {
         <h1 className="text-2xl font-bold text-gray-900">응모·추첨 관리</h1>
         <p className="text-gray-500 text-sm mt-1">
           {isManualItem
-            ? (isJackpotItem
-                ? '응모 목표 도달 시 자동으로 「추첨중」으로 전환되며, 어드민이 당첨자를 지정합니다 (포인트는 「지급 완료 처리」 수동)'
-                : '응모 목표 도달 시 자동으로 「추첨중」으로 전환되며, 어드민이 당첨자를 지정하면 포인트가 자동 지급됩니다')
+            ? '응모 목표 도달 시 자동으로 「추첨중」으로 전환됩니다. 어드민이 당첨자를 지정한 뒤 「지급 완료 처리」를 클릭해야 포인트가 지급됩니다.'
             : '목표 응모 수 달성 시 자동 추첨됩니다'}
         </p>
       </div>
@@ -422,9 +419,7 @@ export default function RafflePage() {
                       응모자 {uniqueUsers.toLocaleString()}명 · 티켓 {totalTickets.toLocaleString()}장 (응모는 마감되었습니다)
                     </p>
                     <p className="text-[11px] text-blue-500 mt-1">
-                      {isJackpotItem
-                        ? '※ 100万P 는 지정 후 「지급 완료 처리」 수동 단계가 별도 필요합니다.'
-                        : `※ 지정 즉시 ${selectedItem?.title_ja ?? '상품'} 포인트가 자동 지급됩니다.`}
+                      ※ 지정 후 별도 「지급 완료 처리」 클릭 시점에 포인트가 지급됩니다.
                     </p>
                   </div>
                 )}
@@ -434,9 +429,7 @@ export default function RafflePage() {
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <p className="text-sm font-semibold text-gray-700">✅ 추첨 완료</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {isJackpotItem
-                        ? '아래 당첨자 카드에서 「지급 완료 처리」 · 후기 관리를 진행할 수 있습니다.'
-                        : '포인트는 자동 지급되었습니다. 아래 당첨자 카드에서 후기 관리를 진행할 수 있습니다.'}
+                      아래 당첨자 카드에서 「지급 완료 처리」 · 후기 관리를 진행할 수 있습니다.
                     </p>
                   </div>
                 )}
