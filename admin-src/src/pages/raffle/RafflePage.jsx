@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 // 100P (prize_value <= AUTO_DRAW_MAX_PRIZE) 만 자동 추첨, 그 외는 어드민 직접 지정
-// 모든 수동 추첨 상품(5천/1만/100万)은 「당첨 지정 → 지급 완료 처리」 2단계로 통일
+// 모든 추첨 상품(100P 포함)은 어드민 「당첨 지정」 후 사용자가 앱에서 「受け取る」 버튼을
+// 직접 눌러야 포인트가 지급됨 (Phase 1A 셀프 클레임 플로우)
 const AUTO_DRAW_MAX_PRIZE = 100
 
 const statusBadge = (s) => {
@@ -120,7 +121,7 @@ export default function RafflePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('raffle_winners')
-        .select('user_id, prize_delivered, delivery_method, winner_review, review_approved, created_at, profiles!user_id(nickname)')
+        .select('id, user_id, prize_delivered, delivery_method, winner_review, review_approved, claimed_at, created_at, profiles!user_id(nickname)')
         .eq('round_id', selectedRound.id)
       if (error) throw error
       return data ?? []
@@ -128,26 +129,13 @@ export default function RafflePage() {
     enabled: !!selectedRound,
   })
 
-  const approveReview = useMutation({
-    mutationFn: async ({ userId, approved }) => {
-      const { error } = await supabase
-        .from('raffle_winners')
-        .update({ review_approved: approved })
-        .eq('round_id', selectedRound.id)
-        .eq('user_id', userId)
-      if (error) throw error
-    },
-    onSuccess: () => qc.invalidateQueries(['raffle-winners', selectedRound?.id]),
-  })
-
-  const markDelivered = useMutation({
-    mutationFn: async (userId) => {
-      const { error } = await supabase
-        .from('raffle_winners')
-        .update({ prize_delivered: true })
-        .eq('round_id', selectedRound.id)
-        .eq('user_id', userId)
-      if (error) throw error
+  // 부적절한 코멘트 사후 숨김 (review_approved=false + winner_review=NULL)
+  const hideComment = useMutation({
+    mutationFn: async (winnerId) => {
+      const { error } = await supabase.rpc('admin_hide_raffle_comment', {
+        p_winner_id: winnerId,
+      })
+      if (error) throw new Error(error.message)
     },
     onSuccess: () => qc.invalidateQueries(['raffle-winners', selectedRound?.id]),
   })
@@ -183,9 +171,10 @@ export default function RafflePage() {
   }
 
   // 어드민 당첨자 지정 RPC.
-  // - 모든 수동 추첨 상품(5천/1만/100万): prize_delivered=false 로 등록만 수행
-  //   → 어드민이 별도 「지급 완료 처리」 클릭 시 포인트 지급
-  // - 100P 회차는 자동 추첨 대상이라 RPC 자체가 거부함
+  // - 모든 수동 추첨 상품(5천/1만/100万): prize_delivered=false / claimed_at=NULL 로 등록만
+  // - 사용자가 앱 「ポイント履歴」 화면에서 직접 「受け取る」 클릭 → claim_raffle_prize RPC
+  //   가 포인트 지급 + 코멘트 저장 + claimed_at 갱신을 수행
+  // - 100P 회차는 자동 추첨이라 어드민 지정 불가 (RPC 가 거부)
   const pickWinner = useMutation({
     mutationFn: async ({ userId, nickname }) => {
       const { error } = await supabase.rpc('admin_pick_raffle_winner', {
@@ -210,7 +199,7 @@ export default function RafflePage() {
       `당첨자: ${nickname}\n` +
       `회차: #${selectedRound.round_no}\n` +
       `상품: ${prizeLabel}\n\n` +
-      `※ 지정 후 별도 「지급 완료 처리」 클릭 시점에 포인트가 지급됩니다.\n` +
+      `※ 지정 후 사용자가 앱에서 「受け取る」 버튼을 직접 눌러야 포인트가 지급됩니다.\n` +
       `한 번 지정하면 되돌릴 수 없습니다. 진행하시겠습니까?`
     )
     if (!ok) return
@@ -238,8 +227,8 @@ export default function RafflePage() {
         <h1 className="text-2xl font-bold text-gray-900">응모·추첨 관리</h1>
         <p className="text-gray-500 text-sm mt-1">
           {isManualItem
-            ? '응모 목표 도달 시 자동으로 「추첨중」으로 전환됩니다. 어드민이 당첨자를 지정한 뒤 「지급 완료 처리」를 클릭해야 포인트가 지급됩니다.'
-            : '목표 응모 수 달성 시 자동 추첨됩니다'}
+            ? '응모 목표 도달 시 자동으로 「추첨중」으로 전환됩니다. 어드민이 당첨자를 지정한 후, 사용자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다.'
+            : '목표 응모 수 달성 시 자동 추첨됩니다. 사용자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다.'}
         </p>
       </div>
 
@@ -419,17 +408,17 @@ export default function RafflePage() {
                       응모자 {uniqueUsers.toLocaleString()}명 · 티켓 {totalTickets.toLocaleString()}장 (응모는 마감되었습니다)
                     </p>
                     <p className="text-[11px] text-blue-500 mt-1">
-                      ※ 지정 후 별도 「지급 완료 처리」 클릭 시점에 포인트가 지급됩니다.
+                      ※ 지정 후 사용자가 앱에서 「受け取る」 버튼을 직접 눌러야 포인트가 지급됩니다.
                     </p>
                   </div>
                 )}
 
-                {/* 수동 추첨 상품: 완료 안내 */}
+                {/* 추첨 완료 안내 (수동 추첨 상품) */}
                 {isManualItem && selectedRound.status === 'completed' && (
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <p className="text-sm font-semibold text-gray-700">✅ 추첨 완료</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      아래 당첨자 카드에서 「지급 완료 처리」 · 후기 관리를 진행할 수 있습니다.
+                      당첨자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다. 코멘트는 부적절 시 「숨김 처리」 가능합니다.
                     </p>
                   </div>
                 )}
@@ -452,32 +441,42 @@ export default function RafflePage() {
                           <Link to={`/admin/users/${w.user_id}`} className="font-medium text-brand hover:underline">
                             {w.profiles?.nickname || `ユーザー${w.user_id?.slice(0, 4)}`}
                           </Link>
-                          {w.prize_delivered
-                            ? <span className="badge-green">포인트 지급완료</span>
-                            : <button onClick={() => markDelivered.mutate(w.user_id)}
-                                className="btn-primary text-xs py-1">지급 완료 처리</button>}
+                          {w.claimed_at
+                            ? <span className="badge-green">
+                                수령 완료 ({new Date(w.claimed_at).toLocaleDateString('ko-KR')})
+                              </span>
+                            : <span className="badge-yellow">수령 대기</span>}
                         </div>
 
                         {w.winner_review ? (
                           <div className="bg-gray-50 rounded-lg p-3">
-                            <div className="text-xs text-gray-500 mb-1">당첨 후기</div>
-                            <p className="text-sm text-gray-700">"{w.winner_review}"</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              {w.review_approved === true  && <span className="badge-green">후기 승인됨</span>}
-                              {w.review_approved === false && <span className="badge-red">후기 거절됨</span>}
-                              {w.review_approved === null  && <span className="badge-yellow">검토 필요</span>}
-                              {w.review_approved !== true && (
-                                <button onClick={() => approveReview.mutate({ userId: w.user_id, approved: true })}
-                                  className="text-xs text-green-600 hover:underline">승인</button>
-                              )}
-                              {w.review_approved !== false && (
-                                <button onClick={() => approveReview.mutate({ userId: w.user_id, approved: false })}
-                                  className="text-xs text-red-600 hover:underline">거절</button>
-                              )}
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-xs text-gray-500">사용자 코멘트</div>
+                              {w.review_approved
+                                ? <span className="badge-green">노출중</span>
+                                : <span className="badge-gray">숨김</span>}
                             </div>
+                            <p className="text-sm text-gray-700">"{w.winner_review}"</p>
+                            {w.review_approved && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm('이 코멘트를 숨김 처리하시겠습니까?\n(앱 내 当選内訳에서 사라집니다)')) {
+                                      hideComment.mutate(w.id)
+                                    }
+                                  }}
+                                  className="text-xs text-red-600 hover:underline"
+                                  disabled={hideComment.isPending}
+                                >
+                                  🚫 숨김 처리
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          <div className="text-xs text-gray-400">후기 미작성</div>
+                          <div className="text-xs text-gray-400">
+                            {w.claimed_at ? '코멘트 미작성' : '수령 전'}
+                          </div>
                         )}
 
                         <div className="text-xs text-gray-400">
