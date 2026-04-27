@@ -57,7 +57,8 @@ export default function RafflePage() {
   }
 
   // 선택 상품의 라운드 목록
-  const { data: rounds } = useQuery({
+  // staleTime:0 + refetchInterval:8000: drawing 라운드 전환 시 즉시 반영
+  const { data: rounds, refetch: refetchRounds } = useQuery({
     queryKey: ['raffle-rounds', selectedItemId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -69,6 +70,8 @@ export default function RafflePage() {
       return data ?? []
     },
     enabled: !!selectedItemId,
+    staleTime: 0,
+    refetchInterval: 8000,
   })
 
   // 페이지 진입(또는 탭 전환) 시 최신 진행중 회차 자동 선택
@@ -223,13 +226,21 @@ export default function RafflePage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">응모·추첨 관리</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          {isManualItem
-            ? '응모 목표 도달 시 자동으로 「추첨중」으로 전환됩니다. 어드민이 당첨자를 지정한 후, 사용자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다.'
-            : '목표 응모 수 달성 시 자동 추첨됩니다. 사용자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다.'}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">응모·추첨 관리</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {isManualItem
+              ? '응모 목표 도달 시 자동으로 「추첨중」으로 전환됩니다. 어드민이 당첨자를 지정한 후, 사용자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다.'
+              : '목표 응모 수 달성 시 자동 추첨됩니다. 사용자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다.'}
+          </p>
+        </div>
+        <button
+          onClick={() => refetchRounds()}
+          className="shrink-0 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 whitespace-nowrap"
+        >
+          🔄 새로고침
+        </button>
       </div>
 
       {/* 상품 탭 */}
