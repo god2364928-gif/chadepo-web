@@ -3,7 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
-const MANUAL_DRAW_THRESHOLD = 1_000_000
+// 100P (prize_value <= AUTO_DRAW_MAX_PRIZE) 만 자동 추첨, 그 외는 어드민 직접 지정
+const AUTO_DRAW_MAX_PRIZE = 100
+// 잭팟 (>= JACKPOT_PRIZE) 은 「지급 완료 처리」 수동 단계 유지 (큰 금액)
+const JACKPOT_PRIZE = 1_000_000
 
 const statusBadge = (s) => {
   if (s === 'active')    return <span className="badge-green">진행중</span>
@@ -180,27 +183,17 @@ export default function RafflePage() {
     startDrawing.mutate()
   }
 
+  // 어드민 당첨자 지정 RPC.
+  // - 5천/1만 P: 포인트 자동 지급 + prize_delivered=true
+  // - 100万P:    prize_delivered=false 로 등록 → 「지급 완료 처리」 수동 클릭 (종전과 동일)
+  // - 100P 회차는 자동 추첨 대상이라 RPC 자체가 거부함
   const pickWinner = useMutation({
     mutationFn: async ({ userId, nickname }) => {
-      // 1) raffle_winners 등록
-      const { error: winErr } = await supabase.from('raffle_winners').insert({
-        round_id:        selectedRound.id,
-        user_id:         userId,
-        prize_delivered: false,
+      const { error } = await supabase.rpc('admin_pick_raffle_winner', {
+        p_round_id: selectedRound.id,
+        p_user_id:  userId,
       })
-      if (winErr) throw new Error(winErr.message)
-
-      // 2) 회차 완료 처리
-      const { error: rndErr } = await supabase
-        .from('raffle_rounds')
-        .update({
-          status:     'completed',
-          drawn_at:   new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', selectedRound.id)
-      if (rndErr) throw new Error(rndErr.message)
-
+      if (error) throw new Error(error.message)
       return nickname
     },
     onSuccess: () => {
@@ -212,8 +205,13 @@ export default function RafflePage() {
   })
 
   const handlePickWinner = (userId, nickname) => {
+    const isJackpotItem  = (selectedItem?.prize_value ?? 0) >= JACKPOT_PRIZE
+    const prizeLabel     = selectedItem?.title_ja ?? '상품'
+    const creditNotice   = isJackpotItem
+      ? `\n\n※ ${prizeLabel} 는 지정 후 「지급 완료 처리」 수동 단계가 별도 필요합니다.`
+      : `\n\n※ 지정 즉시 ${prizeLabel} 포인트가 자동 지급됩니다.`
     const ok = window.confirm(
-      `⚠️ 당첨자로 지정합니다.\n\n당첨자: ${nickname}\n회차: #${selectedRound.round_no}\n\n한 번 지정하면 되돌릴 수 없습니다. 진행하시겠습니까?`
+      `⚠️ 당첨자로 지정합니다.\n\n당첨자: ${nickname}\n회차: #${selectedRound.round_no}${creditNotice}\n\n한 번 지정하면 되돌릴 수 없습니다. 진행하시겠습니까?`
     )
     if (!ok) return
     setPickError('')
@@ -224,10 +222,14 @@ export default function RafflePage() {
   const targetEntries = selectedRound?.target_entries  ?? 0
   const uniqueUsers   = entriesTotal
   const selectedItem  = items?.find(i => i.id === selectedItemId)
-  const isManualItem  = (selectedItem?.prize_value ?? 0) >= MANUAL_DRAW_THRESHOLD
+  const prizeValue    = selectedItem?.prize_value ?? 0
+  // 100P 만 자동 추첨, 그 외(5천/1만/100万)는 어드민 직접 지정
+  const isManualItem  = prizeValue > AUTO_DRAW_MAX_PRIZE
+  const isJackpotItem = prizeValue >= JACKPOT_PRIZE
   const targetReached = targetEntries > 0 && totalTickets >= targetEntries
   const canPickWinner = isManualItem && selectedRound?.status === 'drawing'
-  // 「추첨 시작」 버튼은 목표 응모 수 달성 시에만 노출 (DB RPC 도 동일 가드 보유)
+  // 통상은 응모 목표 도달 시 자동으로 drawing 으로 전환되므로
+  // 「추첨 시작」 버튼은 거의 노출되지 않음 (자동 전환 실패 시 안전망).
   const canStartDraw  = isManualItem && selectedRound?.status === 'active' && targetReached
   const showTargetWaiting = isManualItem && selectedRound?.status === 'active' && !targetReached
 
@@ -237,7 +239,9 @@ export default function RafflePage() {
         <h1 className="text-2xl font-bold text-gray-900">응모·추첨 관리</h1>
         <p className="text-gray-500 text-sm mt-1">
           {isManualItem
-            ? '100만P 라운드는 「진행중 → 추첨중 → 완료」 순으로 운영합니다'
+            ? (isJackpotItem
+                ? '응모 목표 도달 시 자동으로 「추첨중」으로 전환되며, 어드민이 당첨자를 지정합니다 (포인트는 「지급 완료 처리」 수동)'
+                : '응모 목표 도달 시 자동으로 「추첨중」으로 전환되며, 어드민이 당첨자를 지정하면 포인트가 자동 지급됩니다')
             : '목표 응모 수 달성 시 자동 추첨됩니다'}
         </p>
       </div>
@@ -372,21 +376,21 @@ export default function RafflePage() {
                   </div>
                 )}
 
-                {/* 100만P: 목표 미달 (응모 접수 중) */}
+                {/* 수동 추첨 상품: 응모 접수 중 (목표 미달) */}
                 {showTargetWaiting && (
                   <div className="mt-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <p className="text-sm font-semibold text-amber-800">⏳ 응모 접수중 — 목표 미달</p>
+                    <p className="text-sm font-semibold text-amber-800">⏳ 응모 접수중</p>
                     <p className="text-xs text-amber-700 mt-1">
                       현재 티켓 {totalTickets.toLocaleString()}장 / 목표 {targetEntries.toLocaleString()}장
                       &nbsp;(<span className="font-semibold">{(targetEntries - totalTickets).toLocaleString()}장 남음</span>)
                     </p>
                     <p className="text-[11px] text-amber-600 mt-1.5">
-                      목표 응모 수에 도달해야 「추첨 시작」 버튼이 활성화됩니다.
+                      목표 응모 수에 도달하면 자동으로 「추첨중」 단계로 넘어가고, 다음 회차가 즉시 새로 열립니다.
                     </p>
                   </div>
                 )}
 
-                {/* 100만P: 목표 달성 → 추첨 시작 가능 */}
+                {/* 안전망: 자동 전환되지 않은 경우(드뭄) 어드민이 수동 시작 */}
                 {canStartDraw && (
                   <div className="mt-3 p-4 bg-purple-50 rounded-lg border border-purple-200">
                     <div className="flex items-center justify-between gap-3">
@@ -396,7 +400,7 @@ export default function RafflePage() {
                           현재 {uniqueUsers.toLocaleString()}명 · 티켓 {totalTickets.toLocaleString()}장 (목표 {targetEntries.toLocaleString()}장)
                         </p>
                         <p className="text-[11px] text-purple-500 mt-1">
-                          추첨을 시작하면 응모 접수가 종료되고, 당첨자를 직접 선택할 수 있는 단계로 넘어갑니다.
+                          통상은 자동 전환됩니다. 수동 시작 시 응모 접수가 종료되고 당첨자를 직접 선택하는 단계로 넘어갑니다.
                         </p>
                       </div>
                       <button
@@ -410,22 +414,29 @@ export default function RafflePage() {
                   </div>
                 )}
 
-                {/* 100만P: 추첨중 안내 */}
+                {/* 추첨중: 어드민이 당첨자 직접 선택 */}
                 {canPickWinner && (
                   <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
                     <p className="text-sm font-semibold text-blue-800">👇 아래 응모자 목록에서 당첨자를 직접 선택하세요</p>
                     <p className="text-xs text-blue-600 mt-0.5">
                       응모자 {uniqueUsers.toLocaleString()}명 · 티켓 {totalTickets.toLocaleString()}장 (응모는 마감되었습니다)
                     </p>
+                    <p className="text-[11px] text-blue-500 mt-1">
+                      {isJackpotItem
+                        ? '※ 100万P 는 지정 후 「지급 완료 처리」 수동 단계가 별도 필요합니다.'
+                        : `※ 지정 즉시 ${selectedItem?.title_ja ?? '상품'} 포인트가 자동 지급됩니다.`}
+                    </p>
                   </div>
                 )}
 
-                {/* 100만P: 완료 안내 */}
+                {/* 수동 추첨 상품: 완료 안내 */}
                 {isManualItem && selectedRound.status === 'completed' && (
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <p className="text-sm font-semibold text-gray-700">✅ 추첨 완료</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      아래 당첨자 카드에서 포인트 지급 · 후기 관리를 진행할 수 있습니다.
+                      {isJackpotItem
+                        ? '아래 당첨자 카드에서 「지급 완료 처리」 · 후기 관리를 진행할 수 있습니다.'
+                        : '포인트는 자동 지급되었습니다. 아래 당첨자 카드에서 후기 관리를 진행할 수 있습니다.'}
                     </p>
                   </div>
                 )}
