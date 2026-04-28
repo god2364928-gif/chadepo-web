@@ -47,3 +47,7 @@
 - 함수형 컴포넌트 + Hooks
 - async/await 우선 (then 체인보다)
 - const 우선
+
+## 의존성 정책 명확화
+- 런타임 dependencies 버전 변경 금지 (react, supabase-js 등)
+- devDependencies 추가는 코드 품질/빌드 도구에 한해 허용 (lint, format, type check 등)
