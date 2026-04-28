@@ -278,7 +278,7 @@ export default function MissionsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">게임·미션 관리</h1>
           <p className="text-sm text-gray-500 mt-1">
-            앱 "あそぶ" 기준 — 퀘스트 6종 / 게임 15종 / 퀘스트 박스
+            앱 &quot;あそぶ&quot; 기준 — 퀘스트 6종 / 게임 15종 / 퀘스트 박스
           </p>
         </div>
         {tab !== 'time' && <DatePicker value={date} onChange={handleDate} />}

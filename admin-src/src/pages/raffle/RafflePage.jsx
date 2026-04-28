@@ -515,7 +515,7 @@ export default function RafflePage() {
                                 <span className="badge-gray">숨김</span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-700">"{w.winner_review}"</p>
+                            <p className="text-sm text-gray-700">&quot;{w.winner_review}&quot;</p>
                             {w.review_approved && (
                               <div className="flex items-center gap-2 mt-2">
                                 <button
