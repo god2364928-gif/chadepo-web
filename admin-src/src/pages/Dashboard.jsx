@@ -4,11 +4,11 @@ import { Link } from 'react-router-dom'
 
 function StatCard({ label, value, sub, color = 'gray', to }) {
   const colors = {
-    gray:   'border-gray-200 bg-white',
+    gray: 'border-gray-200 bg-white',
     orange: 'border-brand bg-orange-50',
-    red:    'border-red-400 bg-red-50',
-    green:  'border-green-400 bg-green-50',
-    blue:   'border-blue-400 bg-blue-50',
+    red: 'border-red-400 bg-red-50',
+    green: 'border-green-400 bg-green-50',
+    blue: 'border-blue-400 bg-blue-50',
   }
   const card = (
     <div className={`rounded-xl border-l-4 p-5 shadow-sm ${colors[color]}`}>
@@ -47,7 +47,9 @@ export default function Dashboard() {
     queryFn: async () => {
       const { data } = await supabase
         .from('exchange_requests')
-        .select('id, points_spent, status, created_at, user_id, profiles!user_id(nickname), exchange_items!item_id(title_ja)')
+        .select(
+          'id, points_spent, status, created_at, user_id, profiles!user_id(nickname), exchange_items!item_id(title_ja)'
+        )
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(5)
@@ -57,7 +59,12 @@ export default function Dashboard() {
 
   if (isLoading) return <div className="text-gray-400 text-sm">読み込み中...</div>
 
-  const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
+  const today = new Date().toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  })
 
   return (
     <div className="space-y-8">
@@ -68,22 +75,59 @@ export default function Dashboard() {
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="전체 가입자" value={stats?.total_users?.toLocaleString()} color="gray" to="/admin/users" />
-        <StatCard label="오늘 신규 가입" value={stats?.today_signups} color="blue" to="/admin/users" />
-        <StatCard label="교환 대기 중" value={stats?.pending_exchanges} color={stats?.pending_exchanges > 0 ? 'orange' : 'gray'} to="/admin/exchange" sub="처리 필요" />
-        <StatCard label="의심 유저" value={stats?.flagged_users} color={stats?.flagged_users > 0 ? 'red' : 'gray'} to="/admin/fraud" sub="확인 필요" />
+        <StatCard
+          label="전체 가입자"
+          value={stats?.total_users?.toLocaleString()}
+          color="gray"
+          to="/admin/users"
+        />
+        <StatCard
+          label="오늘 신규 가입"
+          value={stats?.today_signups}
+          color="blue"
+          to="/admin/users"
+        />
+        <StatCard
+          label="교환 대기 중"
+          value={stats?.pending_exchanges}
+          color={stats?.pending_exchanges > 0 ? 'orange' : 'gray'}
+          to="/admin/exchange"
+          sub="처리 필요"
+        />
+        <StatCard
+          label="의심 유저"
+          value={stats?.flagged_users}
+          color={stats?.flagged_users > 0 ? 'red' : 'gray'}
+          to="/admin/fraud"
+          sub="확인 필요"
+        />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard label="오늘 포인트 발행" value={`${(stats?.today_points_issued ?? 0).toLocaleString()} P`} color="green" />
-        <StatCard label="오늘 에너지 발행" value={`${(stats?.today_energy_issued ?? 0).toLocaleString()} E`} color="green" />
-        <StatCard label="진행 중 응모 라운드" value={stats?.active_raffle_rounds} color="blue" to="/admin/raffle" />
+        <StatCard
+          label="오늘 포인트 발행"
+          value={`${(stats?.today_points_issued ?? 0).toLocaleString()} P`}
+          color="green"
+        />
+        <StatCard
+          label="오늘 에너지 발행"
+          value={`${(stats?.today_energy_issued ?? 0).toLocaleString()} E`}
+          color="green"
+        />
+        <StatCard
+          label="진행 중 응모 라운드"
+          value={stats?.active_raffle_rounds}
+          color="blue"
+          to="/admin/raffle"
+        />
       </div>
 
       {/* 최근 가입자 */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-900">최근 가입자</h2>
-          <Link to="/admin/users" className="text-brand text-sm hover:underline">전체 보기 →</Link>
+          <Link to="/admin/users" className="text-brand text-sm hover:underline">
+            전체 보기 →
+          </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -97,20 +141,31 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {(recentUsers ?? []).map(u => (
+              {(recentUsers ?? []).map((u) => (
                 <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="py-2.5">
-                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">
+                    <Link
+                      to={`/admin/users/${u.id}`}
+                      className="text-brand hover:underline font-medium"
+                    >
                       {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
                     </Link>
                   </td>
-                  <td className="py-2.5 text-right text-gray-700">{u.points?.toLocaleString()} P</td>
-                  <td className="py-2.5 text-right text-gray-700">{u.energy?.toLocaleString()} E</td>
-                  <td className="py-2.5 text-right text-gray-400">{new Date(u.created_at).toLocaleDateString('ko-KR')}</td>
+                  <td className="py-2.5 text-right text-gray-700">
+                    {u.points?.toLocaleString()} P
+                  </td>
+                  <td className="py-2.5 text-right text-gray-700">
+                    {u.energy?.toLocaleString()} E
+                  </td>
+                  <td className="py-2.5 text-right text-gray-400">
+                    {new Date(u.created_at).toLocaleDateString('ko-KR')}
+                  </td>
                   <td className="py-2.5 text-right">
-                    {u.is_flagged
-                      ? <span className="badge-red">의심</span>
-                      : <span className="badge-green">정상</span>}
+                    {u.is_flagged ? (
+                      <span className="badge-red">의심</span>
+                    ) : (
+                      <span className="badge-green">정상</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -124,17 +179,26 @@ export default function Dashboard() {
         <div className="card border-l-4 border-brand">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">⚠️ 처리 대기 교환 신청</h2>
-            <Link to="/admin/exchange" className="text-brand text-sm hover:underline">모두 처리 →</Link>
+            <Link to="/admin/exchange" className="text-brand text-sm hover:underline">
+              모두 처리 →
+            </Link>
           </div>
           <div className="space-y-2">
-            {pendingExchanges.map(ex => (
-              <div key={ex.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+            {pendingExchanges.map((ex) => (
+              <div
+                key={ex.id}
+                className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
+              >
                 <div>
-                  <span className="font-medium text-sm">{ex.profiles?.nickname || `ユーザー${ex.user_id?.slice(0, 4)}`}</span>
+                  <span className="font-medium text-sm">
+                    {ex.profiles?.nickname || `ユーザー${ex.user_id?.slice(0, 4)}`}
+                  </span>
                   <span className="text-gray-400 text-xs ml-2">{ex.exchange_items?.title_ja}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-gray-700">{ex.points_spent?.toLocaleString()} P</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    {ex.points_spent?.toLocaleString()} P
+                  </span>
                   <span className="badge-yellow">대기</span>
                 </div>
               </div>

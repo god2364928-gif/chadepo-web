@@ -9,30 +9,34 @@ const fmtDate = (ts) => {
   if (!ts) return '-'
   const d = new Date(ts)
   return d.toLocaleString('ko-KR', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
   })
 }
 
 const getLastAccessAt = (user) => user.last_seen_at ?? user.updated_at ?? null
 
 const SORT_COLS = {
-  created_at:   { label: '가입일',     asc: false },
-  points:       { label: '포인트',     asc: false },
-  energy:       { label: '에너지',     asc: false },
+  created_at: { label: '가입일', asc: false },
+  points: { label: '포인트', asc: false },
+  energy: { label: '에너지', asc: false },
   last_seen_at: { label: '마지막접속', asc: false },
 }
 
 export default function UserList() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
-  const [page, setPage]     = useState(0)
-  const [sortCol, setSortCol]   = useState('created_at')
-  const [sortAsc, setSortAsc]   = useState(false)
+  const [page, setPage] = useState(0)
+  const [sortCol, setSortCol] = useState('created_at')
+  const [sortAsc, setSortAsc] = useState(false)
 
   const handleSort = (col) => {
     if (sortCol === col) {
-      setSortAsc(a => !a)
+      setSortAsc((a) => !a)
     } else {
       setSortCol(col)
       setSortAsc(false)
@@ -45,13 +49,16 @@ export default function UserList() {
     queryFn: async () => {
       let q = supabase
         .from('profiles')
-        .select('id, nickname, points, energy, is_flagged, is_banned, created_at, updated_at, last_seen_at, social_provider, referral_code', { count: 'exact' })
+        .select(
+          'id, nickname, points, energy, is_flagged, is_banned, created_at, updated_at, last_seen_at, social_provider, referral_code',
+          { count: 'exact' }
+        )
         .order(sortCol, { ascending: sortAsc })
         .range(page * PAGE, (page + 1) * PAGE - 1)
 
       if (search) q = q.ilike('nickname', `%${search}%`)
       if (filter === 'flagged') q = q.eq('is_flagged', true)
-      if (filter === 'banned')  q = q.eq('is_banned', true)
+      if (filter === 'banned') q = q.eq('is_banned', true)
 
       const { data, count, error } = await q
       if (error) throw error
@@ -60,7 +67,7 @@ export default function UserList() {
     keepPreviousData: true,
   })
 
-  const rows  = data?.rows ?? []
+  const rows = data?.rows ?? []
   const total = data?.total ?? 0
 
   const SortBtn = ({ col, label }) => {
@@ -89,12 +96,18 @@ export default function UserList() {
           className="input w-64"
           placeholder="닉네임 검색..."
           value={search}
-          onChange={e => { setSearch(e.target.value); setPage(0) }}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setPage(0)
+          }}
         />
         <select
           className="input w-40"
           value={filter}
-          onChange={e => { setFilter(e.target.value); setPage(0) }}
+          onChange={(e) => {
+            setFilter(e.target.value)
+            setPage(0)
+          }}
         >
           <option value="all">전체</option>
           <option value="flagged">의심 유저</option>
@@ -144,12 +157,19 @@ export default function UserList() {
             <tbody className="divide-y divide-gray-100">
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
-                    <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                    <tr key={i}>
+                      <td colSpan={7} className="px-4 py-3">
+                        <div className="h-4 bg-gray-100 rounded animate-pulse" />
+                      </td>
+                    </tr>
                   ))
-                : rows.map(u => (
+                : rows.map((u) => (
                     <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
-                        <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">
+                        <Link
+                          to={`/admin/users/${u.id}`}
+                          className="text-brand hover:underline font-medium"
+                        >
                           {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
                         </Link>
                         <div className="text-gray-400 text-xs">{u.referral_code}</div>
@@ -170,11 +190,13 @@ export default function UserList() {
                         {fmtDate(getLastAccessAt(u))}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {u.is_banned
-                          ? <span className="badge-red">정지</span>
-                          : u.is_flagged
-                          ? <span className="badge-yellow">의심</span>
-                          : <span className="badge-green">정상</span>}
+                        {u.is_banned ? (
+                          <span className="badge-red">정지</span>
+                        ) : u.is_flagged ? (
+                          <span className="badge-yellow">의심</span>
+                        ) : (
+                          <span className="badge-green">정상</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -185,11 +207,25 @@ export default function UserList() {
         {/* 페이지네이션 */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
           <span className="text-sm text-gray-500">
-            {total === 0 ? '0명' : `${page * PAGE + 1}–${Math.min((page + 1) * PAGE, total)} / ${total.toLocaleString()}명`}
+            {total === 0
+              ? '0명'
+              : `${page * PAGE + 1}–${Math.min((page + 1) * PAGE, total)} / ${total.toLocaleString()}명`}
           </span>
           <div className="flex gap-2">
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="btn-secondary px-3 py-1 text-xs">이전</button>
-            <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * PAGE >= total} className="btn-secondary px-3 py-1 text-xs">다음</button>
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="btn-secondary px-3 py-1 text-xs"
+            >
+              이전
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={(page + 1) * PAGE >= total}
+              className="btn-secondary px-3 py-1 text-xs"
+            >
+              다음
+            </button>
           </div>
         </div>
       </div>

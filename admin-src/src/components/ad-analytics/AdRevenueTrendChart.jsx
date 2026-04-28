@@ -45,13 +45,19 @@ export default function AdRevenueTrendChart({ period, adFormat, refreshKey }) {
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-semibold text-gray-900 text-sm">수익 트렌드</h2>
         <span className="text-xs text-gray-400">
-          최근 {days}일 (JST) · <span className="text-blue-600">● 수익(USD)</span> · <span className="text-gray-500">● 노출수</span>
+          최근 {days}일 (JST) · <span className="text-blue-600">● 수익(USD)</span> ·{' '}
+          <span className="text-gray-500">● 노출수</span>
         </span>
       </div>
       {error ? (
         <div className="px-4 py-6 text-center">
           <p className="text-red-700 text-sm mb-2">불러오기 실패: {error.message}</p>
-          <button onClick={() => refetch()} className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50">다시 시도</button>
+          <button
+            onClick={() => refetch()}
+            className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
+          >
+            다시 시도
+          </button>
         </div>
       ) : isLoading ? (
         <div className="py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
@@ -66,21 +72,26 @@ export default function AdRevenueTrendChart({ period, adFormat, refreshKey }) {
 
 // ─── SVG 차트 (이중축: 좌=revenue, 우=impression) ─────────────────────────
 function TrendChart({ points, days }) {
-  const W = 880, H = 240, PAD_L = 56, PAD_R = 56, PAD_T = 16, PAD_B = 32
+  const W = 880,
+    H = 240,
+    PAD_L = 56,
+    PAD_R = 56,
+    PAD_T = 16,
+    PAD_B = 32
 
   // 전체 일자 시퀀스 생성 (오늘 JST 기준 days 일치, 데이터 없는 날도 X축에 자리 차지)
   const dateSeq = useMemo(() => buildDateSequence(days), [days])
 
   // 데이터 매핑
-  const byDate = new Map(points.map(p => [p.date, p]))
-  const series = dateSeq.map(d => ({
+  const byDate = new Map(points.map((p) => [p.date, p]))
+  const series = dateSeq.map((d) => ({
     date: d,
     revenue: byDate.get(d)?.revenue_usd ?? null,
     impression: byDate.get(d)?.impression_count ?? null,
   }))
 
-  const revenueValues = series.map(s => Number(s.revenue ?? 0))
-  const impressionValues = series.map(s => Number(s.impression ?? 0))
+  const revenueValues = series.map((s) => Number(s.revenue ?? 0))
+  const impressionValues = series.map((s) => Number(s.impression ?? 0))
   const revMax = Math.max(0.0001, ...revenueValues)
   const impMax = Math.max(1, ...impressionValues)
 
@@ -91,10 +102,12 @@ function TrendChart({ points, days }) {
   const yScaleImp = (v) => PAD_T + innerH - (v / impMax) * innerH
 
   const revPath = series
-    .map((s, i) => s.revenue == null ? null : `${xScale(i)},${yScaleRev(Number(s.revenue))}`)
+    .map((s, i) => (s.revenue == null ? null : `${xScale(i)},${yScaleRev(Number(s.revenue))}`))
     .filter(Boolean)
   const impPath = series
-    .map((s, i) => s.impression == null ? null : `${xScale(i)},${yScaleImp(Number(s.impression))}`)
+    .map((s, i) =>
+      s.impression == null ? null : `${xScale(i)},${yScaleImp(Number(s.impression))}`
+    )
     .filter(Boolean)
 
   // y축 tick (3개씩)
@@ -103,9 +116,12 @@ function TrendChart({ points, days }) {
 
   // x축 라벨 (3~5개)
   const labelCount = Math.min(5, series.length)
-  const labelIdx = labelCount === 1
-    ? [0]
-    : Array.from({ length: labelCount }, (_, i) => Math.round(i * (series.length - 1) / (labelCount - 1)))
+  const labelIdx =
+    labelCount === 1
+      ? [0]
+      : Array.from({ length: labelCount }, (_, i) =>
+          Math.round((i * (series.length - 1)) / (labelCount - 1))
+        )
 
   const [hoverIdx, setHoverIdx] = useState(null)
 
@@ -114,7 +130,10 @@ function TrendChart({ points, days }) {
     const rect = svg.getBoundingClientRect()
     const xRatio = (e.clientX - rect.left) / rect.width
     const xPx = xRatio * W
-    if (xPx < PAD_L || xPx > W - PAD_R) { setHoverIdx(null); return }
+    if (xPx < PAD_L || xPx > W - PAD_R) {
+      setHoverIdx(null)
+      return
+    }
     const ratio = (xPx - PAD_L) / innerW
     const idx = Math.round(ratio * (series.length - 1))
     setHoverIdx(Math.max(0, Math.min(series.length - 1, idx)))
@@ -133,9 +152,12 @@ function TrendChart({ points, days }) {
         {revTicks.map((v, i) => (
           <line
             key={`g-${i}`}
-            x1={PAD_L} x2={W - PAD_R}
-            y1={yScaleRev(v)} y2={yScaleRev(v)}
-            stroke="#f3f4f6" strokeWidth="1"
+            x1={PAD_L}
+            x2={W - PAD_R}
+            y1={yScaleRev(v)}
+            y2={yScaleRev(v)}
+            stroke="#f3f4f6"
+            strokeWidth="1"
           />
         ))}
 
@@ -143,26 +165,39 @@ function TrendChart({ points, days }) {
         {revTicks.map((v, i) => (
           <text
             key={`yl-${i}`}
-            x={PAD_L - 6} y={yScaleRev(v) + 4}
-            fontSize="10" fill="#3b82f6" textAnchor="end"
-          >${v.toFixed(2)}</text>
+            x={PAD_L - 6}
+            y={yScaleRev(v) + 4}
+            fontSize="10"
+            fill="#3b82f6"
+            textAnchor="end"
+          >
+            ${v.toFixed(2)}
+          </text>
         ))}
 
         {/* y축 우 (impression) 라벨 */}
         {impTicks.map((v, i) => (
           <text
             key={`yr-${i}`}
-            x={W - PAD_R + 6} y={yScaleImp(v) + 4}
-            fontSize="10" fill="#9ca3af" textAnchor="start"
-          >{Math.round(v).toLocaleString()}</text>
+            x={W - PAD_R + 6}
+            y={yScaleImp(v) + 4}
+            fontSize="10"
+            fill="#9ca3af"
+            textAnchor="start"
+          >
+            {Math.round(v).toLocaleString()}
+          </text>
         ))}
 
         {/* x축 라벨 */}
-        {labelIdx.map(i => (
+        {labelIdx.map((i) => (
           <text
             key={`xl-${i}`}
-            x={xScale(i)} y={H - 10}
-            fontSize="10" fill="#9ca3af" textAnchor="middle"
+            x={xScale(i)}
+            y={H - 10}
+            fontSize="10"
+            fill="#9ca3af"
+            textAnchor="middle"
           >
             {formatJstMonthDay(series[i].date + 'T00:00:00+09:00')}
           </text>
@@ -170,22 +205,12 @@ function TrendChart({ points, days }) {
 
         {/* impression 라인 (회색) */}
         {impPath.length > 1 && (
-          <polyline
-            fill="none"
-            stroke="#9ca3af"
-            strokeWidth="1.5"
-            points={impPath.join(' ')}
-          />
+          <polyline fill="none" stroke="#9ca3af" strokeWidth="1.5" points={impPath.join(' ')} />
         )}
 
         {/* revenue 라인 (파랑) */}
         {revPath.length > 1 && (
-          <polyline
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="2"
-            points={revPath.join(' ')}
-          />
+          <polyline fill="none" stroke="#3b82f6" strokeWidth="2" points={revPath.join(' ')} />
         )}
 
         {/* 점 */}
@@ -195,34 +220,58 @@ function TrendChart({ points, days }) {
               <circle cx={xScale(i)} cy={yScaleImp(Number(s.impression))} r="2.5" fill="#9ca3af" />
             )}
             {s.revenue != null && (
-              <circle cx={xScale(i)} cy={yScaleRev(Number(s.revenue))} r="3" fill="#3b82f6" stroke="white" strokeWidth="1.5" />
+              <circle
+                cx={xScale(i)}
+                cy={yScaleRev(Number(s.revenue))}
+                r="3"
+                fill="#3b82f6"
+                stroke="white"
+                strokeWidth="1.5"
+              />
             )}
           </g>
         ))}
 
         {/* hover 가이드 + 툴팁 */}
-        {hoverIdx != null && (() => {
-          const s = series[hoverIdx]
-          const x = xScale(hoverIdx)
-          const tipW = 170, tipH = 64
-          const tipX = Math.min(W - PAD_R - tipW, Math.max(PAD_L, x - tipW / 2))
-          const tipY = PAD_T
-          return (
-            <g>
-              <line x1={x} x2={x} y1={PAD_T} y2={H - PAD_B} stroke="#d1d5db" strokeDasharray="3 3" />
-              <rect x={tipX} y={tipY} width={tipW} height={tipH} rx="4" fill="white" stroke="#e5e7eb" />
-              <text x={tipX + 8} y={tipY + 16} fontSize="11" fill="#374151" fontWeight="600">
-                {formatJstDate(s.date + 'T00:00:00+09:00')}
-              </text>
-              <text x={tipX + 8} y={tipY + 34} fontSize="11" fill="#3b82f6">
-                수익: {s.revenue != null ? formatUsd(s.revenue) : '—'}
-              </text>
-              <text x={tipX + 8} y={tipY + 50} fontSize="11" fill="#6b7280">
-                노출: {s.impression != null ? formatInt(s.impression) : '—'}
-              </text>
-            </g>
-          )
-        })()}
+        {hoverIdx != null &&
+          (() => {
+            const s = series[hoverIdx]
+            const x = xScale(hoverIdx)
+            const tipW = 170,
+              tipH = 64
+            const tipX = Math.min(W - PAD_R - tipW, Math.max(PAD_L, x - tipW / 2))
+            const tipY = PAD_T
+            return (
+              <g>
+                <line
+                  x1={x}
+                  x2={x}
+                  y1={PAD_T}
+                  y2={H - PAD_B}
+                  stroke="#d1d5db"
+                  strokeDasharray="3 3"
+                />
+                <rect
+                  x={tipX}
+                  y={tipY}
+                  width={tipW}
+                  height={tipH}
+                  rx="4"
+                  fill="white"
+                  stroke="#e5e7eb"
+                />
+                <text x={tipX + 8} y={tipY + 16} fontSize="11" fill="#374151" fontWeight="600">
+                  {formatJstDate(s.date + 'T00:00:00+09:00')}
+                </text>
+                <text x={tipX + 8} y={tipY + 34} fontSize="11" fill="#3b82f6">
+                  수익: {s.revenue != null ? formatUsd(s.revenue) : '—'}
+                </text>
+                <text x={tipX + 8} y={tipY + 50} fontSize="11" fill="#6b7280">
+                  노출: {s.impression != null ? formatInt(s.impression) : '—'}
+                </text>
+              </g>
+            )
+          })()}
       </svg>
     </div>
   )
@@ -232,7 +281,10 @@ function TrendChart({ points, days }) {
 function buildDateSequence(days) {
   const out = []
   const fmt = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   })
   // 'YYYY/MM/DD' → 'YYYY-MM-DD'
   for (let i = days - 1; i >= 0; i--) {

@@ -2,15 +2,15 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const nav = [
-  { to: '/admin',          label: 'ダッシュボード',   icon: '📊', exact: true },
-  { to: '/admin/users',    label: 'ユーザー管理',     icon: '👤' },
-  { to: '/admin/exchange', label: '交換管理',         icon: '🎁' },
-  { to: '/admin/raffle',   label: '応募・抽選',       icon: '🎰' },
-  { to: '/admin/fraud',    label: '不正利用検知',     icon: '🚨' },
+  { to: '/admin', label: 'ダッシュボード', icon: '📊', exact: true },
+  { to: '/admin/users', label: 'ユーザー管理', icon: '👤' },
+  { to: '/admin/exchange', label: '交換管理', icon: '🎁' },
+  { to: '/admin/raffle', label: '応募・抽選', icon: '🎰' },
+  { to: '/admin/fraud', label: '不正利用検知', icon: '🚨' },
   { to: '/admin/missions', label: 'ゲーム・ミッション', icon: '🎮' },
-  { to: '/admin/referral', label: '紹介プログラム',   icon: '🔗' },
-  { to: '/admin/inquiry', label: 'お問い合わせ管理',  icon: '💬' },
-  { to: '/admin/ads',     label: '広告分析',         icon: '📺' },
+  { to: '/admin/referral', label: '紹介プログラム', icon: '🔗' },
+  { to: '/admin/inquiry', label: 'お問い合わせ管理', icon: '💬' },
+  { to: '/admin/ads', label: '広告分析', icon: '📺' },
 ]
 
 export default function Layout({ children }) {
@@ -53,7 +53,10 @@ export default function Layout({ children }) {
 
         <div className="px-4 py-4 border-t border-gray-700">
           <div className="text-gray-400 text-xs truncate mb-2">{user?.email}</div>
-          <button onClick={handleLogout} className="text-gray-400 hover:text-white text-xs transition-colors">
+          <button
+            onClick={handleLogout}
+            className="text-gray-400 hover:text-white text-xs transition-colors"
+          >
             ログアウト
           </button>
         </div>
@@ -61,9 +64,7 @@ export default function Layout({ children }) {
 
       {/* 메인 콘텐츠 */}
       <main className="flex-1 overflow-y-auto">
-        <div className="p-8">
-          {children}
-        </div>
+        <div className="p-8">{children}</div>
       </main>
     </div>
   )

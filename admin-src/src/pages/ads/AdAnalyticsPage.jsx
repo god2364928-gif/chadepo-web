@@ -10,7 +10,7 @@ import AdRealtimeTable from '../../components/ad-analytics/AdRealtimeTable'
 
 const TABS = [
   { id: 'aggregate', label: '📊 집계' },
-  { id: 'realtime',  label: '⚡ 실시간' },
+  { id: 'realtime', label: '⚡ 실시간' },
 ]
 
 export default function AdAnalyticsPage() {
@@ -31,7 +31,7 @@ export default function AdAnalyticsPage() {
 
       {/* 탭 */}
       <div className="border-b border-gray-200 flex items-center gap-1">
-        {TABS.map(t => (
+        {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -40,7 +40,9 @@ export default function AdAnalyticsPage() {
                 ? 'border-brand text-brand font-semibold'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
-          >{t.label}</button>
+          >
+            {t.label}
+          </button>
         ))}
       </div>
 
@@ -53,7 +55,7 @@ export default function AdAnalyticsPage() {
               <AdFormatFilter value={adFormat} onChange={setAdFormat} />
             </div>
             <button
-              onClick={() => setRefreshKey(k => k + 1)}
+              onClick={() => setRefreshKey((k) => k + 1)}
               className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
             >
               🔄 새로고침

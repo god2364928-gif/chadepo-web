@@ -1,22 +1,17 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-import {
-  GAME_TYPE_LABELS,
-  GAME_TIER,
-  TIER_META,
-  PUZZLE_GAME_TYPES,
-} from '../../lib/gameLabels'
+import { GAME_TYPE_LABELS, GAME_TIER, TIER_META, PUZZLE_GAME_TYPES } from '../../lib/gameLabels'
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────
 const PERIODS = [
-  { id: '1d',  label: '오늘'  },
-  { id: '7d',  label: '7일'   },
-  { id: '30d', label: '30일'  },
+  { id: '1d', label: '오늘' },
+  { id: '7d', label: '7일' },
+  { id: '30d', label: '30일' },
 ]
 
 const REACTION_TREND_DAYS = 30
-const REACTION_LOW_SAMPLE = 10        // 이 미만이면 회색 처리
+const REACTION_LOW_SAMPLE = 10 // 이 미만이면 회색 처리
 
 // ─── 유틸 ─────────────────────────────────────────────────────────────────
 function fmtMs(ms) {
@@ -37,9 +32,9 @@ function fmtPct(pct) {
 function rateColor(pct) {
   if (pct == null) return 'text-gray-400'
   const v = Number(pct)
-  if (v === 0)   return 'text-red-600 font-bold'
-  if (v < 30)    return 'text-orange-500 font-medium'
-  if (v < 70)    return 'text-yellow-600'
+  if (v === 0) return 'text-red-600 font-bold'
+  if (v < 30) return 'text-orange-500 font-medium'
+  if (v < 70) return 'text-yellow-600'
   return 'text-green-600'
 }
 
@@ -49,7 +44,11 @@ export default function GameTimeStats() {
   const [appVersion, setAppVersion] = useState('') // '' = 전체
 
   // 통계 (섹션 1+2)
-  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useQuery({
     queryKey: ['game-time-stats', period, appVersion],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('admin_get_game_play_stats', {
@@ -93,30 +92,25 @@ export default function GameTimeStats() {
   // → 이번 PR 에서는 「전체」만 노출. 데이터 모이면 별도 PR 에서 옵션화.
 
   if (statsError) {
-    return (
-      <div className="card text-red-600 text-sm">
-        통계 불러오기 실패: {statsError.message}
-      </div>
-    )
+    return <div className="card text-red-600 text-sm">통계 불러오기 실패: {statsError.message}</div>
   }
 
   // 섹션 1+2 기본 합계
   const totalAttempts = (stats ?? []).reduce((s, r) => s + Number(r.attempt_count), 0)
   const totalCompletes = (stats ?? []).reduce((s, r) => s + Number(r.completed_count), 0)
-  const overallRate = totalAttempts > 0
-    ? Math.round((totalCompletes / totalAttempts) * 1000) / 10
-    : null
+  const overallRate =
+    totalAttempts > 0 ? Math.round((totalCompletes / totalAttempts) * 1000) / 10 : null
   const totalAbuses = (stats ?? []).reduce((s, r) => s + Number(r.abuse_count ?? 0), 0)
 
   // 섹션 2: 퍼즐 게임만 필터 + measured_count 0 인 행 제외
-  const puzzleRows = (stats ?? []).filter(r =>
-    PUZZLE_GAME_TYPES.has(r.game_type) && Number(r.measured_count ?? 0) > 0
+  const puzzleRows = (stats ?? []).filter(
+    (r) => PUZZLE_GAME_TYPES.has(r.game_type) && Number(r.measured_count ?? 0) > 0
   )
 
   // 섹션 2 Y축 스케일: 모든 퍼즐 게임의 max(p75) 기준
   const distMaxMs = Math.max(
     1000,
-    ...puzzleRows.map(r => Number(r.p75_clear_ms ?? r.median_clear_ms ?? 0)),
+    ...puzzleRows.map((r) => Number(r.p75_clear_ms ?? r.median_clear_ms ?? 0))
   )
 
   return (
@@ -125,7 +119,7 @@ export default function GameTimeStats() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500">기간</span>
-          {PERIODS.map(p => (
+          {PERIODS.map((p) => (
             <button
               key={p.id}
               onClick={() => setPeriod(p.id)}
@@ -134,14 +128,16 @@ export default function GameTimeStats() {
                   ? 'bg-brand text-white border-brand font-medium'
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
-            >{p.label}</button>
+            >
+              {p.label}
+            </button>
           ))}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500">앱 버전</span>
           <select
             value={appVersion}
-            onChange={e => setAppVersion(e.target.value)}
+            onChange={(e) => setAppVersion(e.target.value)}
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
           >
             <option value="">전체</option>
@@ -167,9 +163,7 @@ export default function GameTimeStats() {
           <div className="grid grid-cols-3 gap-4">
             <div className="card text-center">
               <p className="text-sm text-gray-500 mb-1">전체 플레이</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {totalAttempts.toLocaleString()}건
-              </p>
+              <p className="text-3xl font-bold text-gray-900">{totalAttempts.toLocaleString()}건</p>
             </div>
             <div className="card text-center">
               <p className="text-sm text-gray-500 mb-1">전체 완료율</p>
@@ -179,9 +173,11 @@ export default function GameTimeStats() {
             </div>
             <div className="card text-center">
               <p className="text-sm text-gray-500 mb-1">어뷰징 의심</p>
-              <p className={`text-3xl font-bold ${
-                totalAbuses === 0 ? 'text-green-600' : 'text-orange-500'
-              }`}>
+              <p
+                className={`text-3xl font-bold ${
+                  totalAbuses === 0 ? 'text-green-600' : 'text-orange-500'
+                }`}
+              >
                 {totalAbuses.toLocaleString()}건
               </p>
             </div>
@@ -192,7 +188,7 @@ export default function GameTimeStats() {
             <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
               <h2 className="font-semibold text-gray-900 text-sm">게임별 완료시간 통계</h2>
               <span className="text-xs text-gray-400">
-                {PERIODS.find(p => p.id === period)?.label} 기준
+                {PERIODS.find((p) => p.id === period)?.label} 기준
               </span>
             </div>
             <div className="overflow-x-auto">
@@ -210,7 +206,7 @@ export default function GameTimeStats() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {(stats ?? []).map(r => {
+                  {(stats ?? []).map((r) => {
                     const tier = GAME_TIER[r.game_type]
                     const tm = TIER_META[tier]
                     const isReaction = r.game_type === 'reaction_speed'
@@ -222,7 +218,9 @@ export default function GameTimeStats() {
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2 flex-wrap">
                             {tm && (
-                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${tm.cls}`}>
+                              <span
+                                className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${tm.cls}`}
+                              >
                                 {tm.label}
                               </span>
                             )}
@@ -242,7 +240,9 @@ export default function GameTimeStats() {
                         <td className="px-4 py-2.5 text-right text-gray-500">
                           {Number(r.completed_count).toLocaleString()}
                         </td>
-                        <td className={`px-4 py-2.5 text-right text-xs ${rateColor(r.completion_rate)}`}>
+                        <td
+                          className={`px-4 py-2.5 text-right text-xs ${rateColor(r.completion_rate)}`}
+                        >
                           {fmtPct(r.completion_rate)}
                         </td>
                         <td className="px-4 py-2.5 text-right text-xs text-gray-700">
@@ -254,9 +254,13 @@ export default function GameTimeStats() {
                         <td className="px-4 py-2.5 text-right text-xs text-gray-400">
                           {Number(measured ?? 0).toLocaleString()}
                         </td>
-                        <td className={`px-4 py-2.5 text-right text-xs ${
-                          Number(r.abuse_count) > 0 ? 'text-orange-500 font-medium' : 'text-gray-300'
-                        }`}>
+                        <td
+                          className={`px-4 py-2.5 text-right text-xs ${
+                            Number(r.abuse_count) > 0
+                              ? 'text-orange-500 font-medium'
+                              : 'text-gray-300'
+                          }`}
+                        >
                           {Number(r.abuse_count) > 0 ? `${r.abuse_count}건` : '—'}
                         </td>
                       </tr>
@@ -278,15 +282,11 @@ export default function GameTimeStats() {
           {puzzleRows.length > 0 && (
             <div className="card">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-gray-900 text-sm">
-                  퍼즐 게임 시간 분포
-                </h2>
-                <span className="text-xs text-gray-400">
-                  P25 ─── 중앙값 ●  ─── P75 (전체 평균)
-                </span>
+                <h2 className="font-semibold text-gray-900 text-sm">퍼즐 게임 시간 분포</h2>
+                <span className="text-xs text-gray-400">P25 ─── 중앙값 ● ─── P75 (전체 평균)</span>
               </div>
               <div className="space-y-3">
-                {puzzleRows.map(r => (
+                {puzzleRows.map((r) => (
                   <DistributionRow
                     key={`${r.game_type}-${r.difficulty}`}
                     row={r}
@@ -295,7 +295,8 @@ export default function GameTimeStats() {
                 ))}
               </div>
               <div className="mt-3 pt-3 border-t border-gray-100 text-[10px] text-gray-400">
-                ※ 「측정 수」가 0인 게임은 제외. 일별 P25/P75의 단순 평균이라 정확한 누적 P25/P75와 다소 차이가 있을 수 있습니다.
+                ※ 「측정 수」가 0인 게임은 제외. 일별 P25/P75의 단순 평균이라 정확한 누적 P25/P75와
+                다소 차이가 있을 수 있습니다.
               </div>
             </div>
           )}
@@ -303,9 +304,7 @@ export default function GameTimeStats() {
           {/* 섹션 3: 반응속도 추세 */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900 text-sm">
-                반응속도 30일 추세
-              </h2>
+              <h2 className="font-semibold text-gray-900 text-sm">반응속도 30일 추세</h2>
               <span className="text-xs text-gray-400">
                 ● 측정 충분 ({REACTION_LOW_SAMPLE}건↑) ・ ● 샘플 부족
               </span>
@@ -341,7 +340,7 @@ function DistributionRow({ row, maxMs }) {
   const p75 = Number(row.p75_clear_ms ?? row.median_clear_ms ?? 0)
   const avg = Number(row.avg_clear_ms ?? p50)
 
-  const left  = `${(p25 / maxMs) * 100}%`
+  const left = `${(p25 / maxMs) * 100}%`
   const width = `${Math.max(0.5, ((p75 - p25) / maxMs) * 100)}%`
   const medLeft = `${(p50 / maxMs) * 100}%`
   const avgLeft = `${(avg / maxMs) * 100}%`
@@ -369,10 +368,7 @@ function DistributionRow({ row, maxMs }) {
       {/* 막대 */}
       <div className="relative h-3 bg-gray-100 rounded-full overflow-visible">
         {/* P25 ─ P75 박스 */}
-        <div
-          className="absolute h-3 bg-brand/30 rounded-full"
-          style={{ left, width }}
-        />
+        <div className="absolute h-3 bg-brand/30 rounded-full" style={{ left, width }} />
         {/* 중앙값 (●) */}
         <div
           className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-brand border-2 border-white shadow"
@@ -384,7 +380,9 @@ function DistributionRow({ row, maxMs }) {
           className="absolute -top-1 -translate-x-1/2 text-[10px] text-gray-500"
           style={{ left: avgLeft }}
           title={`평균 ${fmtMs(avg)}`}
-        >▼</div>
+        >
+          ▼
+        </div>
       </div>
     </div>
   )
@@ -392,20 +390,23 @@ function DistributionRow({ row, maxMs }) {
 
 // ─── 반응속도 30일 추세선 (SVG) ─────────────────────────────────────────
 function ReactionTrendChart({ points }) {
-  const W = 720, H = 180, PAD_L = 40, PAD_R = 12, PAD_T = 16, PAD_B = 28
+  const W = 720,
+    H = 180,
+    PAD_L = 40,
+    PAD_R = 12,
+    PAD_T = 16,
+    PAD_B = 28
 
   if (!points.length) {
     return (
-      <div className="py-12 text-center text-gray-400 text-sm">
-        반응속도 측정 데이터가 없습니다
-      </div>
+      <div className="py-12 text-center text-gray-400 text-sm">반응속도 측정 데이터가 없습니다</div>
     )
   }
 
   // x: 30일 인덱스 / y: avg_score_ms
-  const validPts = points.filter(p => p.avg_score_ms != null)
-  const yMin = validPts.length > 0 ? Math.min(...validPts.map(p => p.avg_score_ms)) : 0
-  const yMax = validPts.length > 0 ? Math.max(...validPts.map(p => p.avg_score_ms)) : 1000
+  const validPts = points.filter((p) => p.avg_score_ms != null)
+  const yMin = validPts.length > 0 ? Math.min(...validPts.map((p) => p.avg_score_ms)) : 0
+  const yMax = validPts.length > 0 ? Math.max(...validPts.map((p) => p.avg_score_ms)) : 1000
   const yRange = Math.max(50, yMax - yMin)
   const yPad = yRange * 0.15
 
@@ -425,11 +426,7 @@ function ReactionTrendChart({ points }) {
     .filter(Boolean)
 
   // y축 기준선 (최소·중간·최대)
-  const yTicks = [
-    yMin - yPad,
-    (yMin + yMax) / 2,
-    yMax + yPad,
-  ]
+  const yTicks = [yMin - yPad, (yMin + yMax) / 2, yMax + yPad]
 
   return (
     <div className="overflow-x-auto">
@@ -438,29 +435,25 @@ function ReactionTrendChart({ points }) {
         {yTicks.map((v, i) => (
           <g key={i}>
             <line
-              x1={PAD_L} x2={W - PAD_R}
-              y1={yScale(v)} y2={yScale(v)}
-              stroke="#f3f4f6" strokeWidth="1"
+              x1={PAD_L}
+              x2={W - PAD_R}
+              y1={yScale(v)}
+              y2={yScale(v)}
+              stroke="#f3f4f6"
+              strokeWidth="1"
             />
-            <text
-              x={PAD_L - 6} y={yScale(v) + 4}
-              fontSize="10" fill="#9ca3af" textAnchor="end"
-            >
+            <text x={PAD_L - 6} y={yScale(v) + 4} fontSize="10" fill="#9ca3af" textAnchor="end">
               {Math.round(v)}ms
             </text>
           </g>
         ))}
 
         {/* x축 라벨 (시작·중간·끝 3개) */}
-        {[0, Math.floor(points.length / 2), points.length - 1].map(i => {
+        {[0, Math.floor(points.length / 2), points.length - 1].map((i) => {
           const p = points[i]
           if (!p) return null
           return (
-            <text
-              key={i}
-              x={xScale(i)} y={H - 8}
-              fontSize="10" fill="#9ca3af" textAnchor="middle"
-            >
+            <text key={i} x={xScale(i)} y={H - 8} fontSize="10" fill="#9ca3af" textAnchor="middle">
               {p.stat_date?.slice(5)} {/* MM-DD */}
             </text>
           )
@@ -468,12 +461,7 @@ function ReactionTrendChart({ points }) {
 
         {/* 추세선 */}
         {linePath.length > 1 && (
-          <polyline
-            fill="none"
-            stroke="#e8531e"
-            strokeWidth="1.5"
-            points={linePath.join(' ')}
-          />
+          <polyline fill="none" stroke="#e8531e" strokeWidth="1.5" points={linePath.join(' ')} />
         )}
 
         {/* 점 */}

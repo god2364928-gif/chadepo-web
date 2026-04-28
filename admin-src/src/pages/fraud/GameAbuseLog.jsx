@@ -9,8 +9,10 @@ const LIMITS = [50, 100, 200, 500]
 function fmtDateTime(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleString('ko-KR', {
-    month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
@@ -24,7 +26,11 @@ export default function GameAbuseLog() {
   const [gameFilter, setGameFilter] = useState('')
   const [limit, setLimit] = useState(100)
 
-  const { data: logs, isLoading, error } = useQuery({
+  const {
+    data: logs,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['abuse-log', gameFilter, limit],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('admin_get_abuse_log', {
@@ -39,16 +45,12 @@ export default function GameAbuseLog() {
 
   if (error) {
     return (
-      <div className="card text-red-600 text-sm">
-        어뷰징 로그 불러오기 실패: {error.message}
-      </div>
+      <div className="card text-red-600 text-sm">어뷰징 로그 불러오기 실패: {error.message}</div>
     )
   }
 
   // 어뷰징 발생한 게임 종류만 셀렉트 옵션으로
-  const distinctGames = Array.from(
-    new Set((logs ?? []).map(r => r.game_type))
-  ).sort()
+  const distinctGames = Array.from(new Set((logs ?? []).map((r) => r.game_type))).sort()
 
   return (
     <div className="space-y-4">
@@ -58,11 +60,11 @@ export default function GameAbuseLog() {
           <span className="text-xs text-gray-500">게임 종류</span>
           <select
             value={gameFilter}
-            onChange={e => setGameFilter(e.target.value)}
+            onChange={(e) => setGameFilter(e.target.value)}
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
           >
             <option value="">전체</option>
-            {distinctGames.map(g => (
+            {distinctGames.map((g) => (
               <option key={g} value={g}>
                 {GAME_TYPE_LABELS[g] ?? g}
               </option>
@@ -73,24 +75,22 @@ export default function GameAbuseLog() {
           <span className="text-xs text-gray-500">표시 건수</span>
           <select
             value={limit}
-            onChange={e => setLimit(Number(e.target.value))}
+            onChange={(e) => setLimit(Number(e.target.value))}
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
           >
-            {LIMITS.map(n => (
-              <option key={n} value={n}>{n}건</option>
+            {LIMITS.map((n) => (
+              <option key={n} value={n}>
+                {n}건
+              </option>
             ))}
           </select>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="card py-12 text-center text-gray-400 text-sm">
-          불러오는 중...
-        </div>
+        <div className="card py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
       ) : (logs ?? []).length === 0 ? (
-        <div className="card py-12 text-center text-gray-400 text-sm">
-          어뷰징 의심 사례 없음 ✅
-        </div>
+        <div className="card py-12 text-center text-gray-400 text-sm">어뷰징 의심 사례 없음 ✅</div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
@@ -118,7 +118,7 @@ export default function GameAbuseLog() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {logs.map(r => {
+                {logs.map((r) => {
                   const isRepeat = Number(r.user_total_violations) >= 3
                   const isMultiGame = Number(r.user_distinct_games) >= 2
                   return (
@@ -149,11 +149,15 @@ export default function GameAbuseLog() {
                         {fmtMs(r.expected_minimum)}
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs">
-                        <span className={
-                          isRepeat ? 'text-red-600 font-bold' :
-                          Number(r.user_total_violations) > 1 ? 'text-orange-500 font-medium' :
-                          'text-gray-400'
-                        }>
+                        <span
+                          className={
+                            isRepeat
+                              ? 'text-red-600 font-bold'
+                              : Number(r.user_total_violations) > 1
+                                ? 'text-orange-500 font-medium'
+                                : 'text-gray-400'
+                          }
+                        >
                           {Number(r.user_total_violations)}회
                         </span>
                         {isMultiGame && (
