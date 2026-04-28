@@ -165,18 +165,6 @@ export default function ExchangePage() {
     keepPreviousData: true,
   })
 
-  const { data: reqSummary } = useQuery({
-    queryKey: ['exchange-summary'],
-    queryFn: async () => {
-      const { data } = await supabase.from('exchange_requests').select('status')
-      if (!data) return {}
-      return data.reduce((acc, r) => {
-        acc[r.status] = (acc[r.status] || 0) + 1
-        return acc
-      }, {})
-    },
-  })
-
   const { data: items } = useQuery({
     queryKey: ['exchange-items'],
     queryFn: async () => {
