@@ -2,6 +2,8 @@
   "rewrites": [
     { "source": "/admin/**",  "destination": "/admin/index.html" },
     { "source": "/admin",    "destination": "/admin/index.html" },
+    { "source": "/legal/tokushoho", "destination": "/legal/tokushoho/index.html" },
+    { "source": "/legal/tokushoho/", "destination": "/legal/tokushoho/index.html" },
     { "source": "/privacy",   "destination": "/privacy/index.html" },
     { "source": "/terms",     "destination": "/terms/index.html" }
   ],
