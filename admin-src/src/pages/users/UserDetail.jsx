@@ -3,6 +3,82 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 
+// auth.users 의 OAuth 메타데이터를 사람이 읽기 좋게 정리해 보여주는 카드.
+// admin_get_user_oauth_info RPC 의 응답 (jsonb) 을 그대로 받는다.
+function SocialAccountCard({ info }) {
+  if (!info) {
+    return (
+      <div className="card space-y-3">
+        <h2 className="font-semibold text-gray-900">소셜 계정 정보</h2>
+        <div className="text-gray-400 text-sm">読み込み中...</div>
+      </div>
+    )
+  }
+
+  const fmt = (ts) => (ts ? new Date(ts).toLocaleString('ko-KR') : '—')
+
+  // 이메일 표시: dummy / Apple 비공개 / 일반 을 라벨로 분리
+  const renderEmail = () => {
+    if (!info.email) return <span className="text-gray-400">—</span>
+    if (info.email_is_dummy) {
+      return (
+        <span className="text-gray-400">
+          미공개 <span className="text-xs">(LINE 미동의)</span>
+        </span>
+      )
+    }
+    return (
+      <span className="break-all">
+        {info.email}
+        {info.email_is_apple_relay && (
+          <span className="ml-1 text-xs badge-gray align-middle">Apple 비공개</span>
+        )}
+      </span>
+    )
+  }
+
+  const rows = [
+    ['표시 이름', info.display_name ?? '—'],
+    ['이메일', renderEmail()],
+    ['이메일 인증', info.email_confirmed_at ? '✅ 인증됨' : '미인증'],
+    ['플랫폼', info.provider ?? '—'],
+    ['플랫폼 ID', info.provider_sub ?? '—'],
+    ['OAuth 가입', fmt(info.created_at)],
+    ['최근 로그인', fmt(info.last_sign_in_at)],
+  ]
+
+  return (
+    <div className="card space-y-3">
+      <div className="flex items-center gap-3">
+        {info.avatar_url ? (
+          <img
+            src={info.avatar_url}
+            alt=""
+            className="w-10 h-10 rounded-full bg-gray-100 object-cover"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs">
+            no img
+          </div>
+        )}
+        <h2 className="font-semibold text-gray-900">소셜 계정 정보</h2>
+      </div>
+      <dl className="space-y-2 text-sm">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-3">
+            <dt className="text-gray-500 whitespace-nowrap">{k}</dt>
+            <dd className="text-gray-900 font-medium text-right max-w-[180px] break-all">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
 function AdjustModal({ type, userId, onClose }) {
   const qc = useQueryClient()
   const [amount, setAmount] = useState('')
@@ -90,6 +166,19 @@ export default function UserDetail() {
     queryKey: ['user', id],
     queryFn: async () => {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single()
+      if (error) throw error
+      return data
+    },
+  })
+
+  // OAuth 가입 정보 (auth.users 영역). admin_get_user_oauth_info RPC 가
+  // is_admin() 가드 + SECURITY DEFINER 로 안전하게 노출한다.
+  const { data: oauthInfo } = useQuery({
+    queryKey: ['user-oauth-info', id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_get_user_oauth_info', {
+        p_user_id: id,
+      })
       if (error) throw error
       return data
     },
@@ -198,14 +287,28 @@ export default function UserDetail() {
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-sm">
           ← 뒤로
         </button>
+        {oauthInfo?.avatar_url ? (
+          <img
+            src={oauthInfo.avatar_url}
+            alt=""
+            className="w-9 h-9 rounded-full bg-gray-100 object-cover"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        ) : null}
         <h1 className="text-2xl font-bold text-gray-900">
           {user.nickname || `ユーザー${user.id.slice(0, 4)}`}
         </h1>
+        {oauthInfo?.display_name ? (
+          <span className="text-sm text-gray-400">({oauthInfo.display_name})</span>
+        ) : null}
         {user.is_banned && <span className="badge-red">정지</span>}
         {user.is_flagged && <span className="badge-yellow">의심</span>}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {/* 기본 정보 */}
         <div className="card space-y-3">
           <h2 className="font-semibold text-gray-900">기본 정보</h2>
@@ -229,6 +332,9 @@ export default function UserDetail() {
             ))}
           </dl>
         </div>
+
+        {/* 소셜 계정 정보 (auth.users / OAuth 측 메타데이터) */}
+        <SocialAccountCard info={oauthInfo} />
 
         {/* 잔액 */}
         <div className="card space-y-4">
