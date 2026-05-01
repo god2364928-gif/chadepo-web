@@ -13,7 +13,9 @@ export default function FraudPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('id, nickname, points, energy, created_at, signup_ip, social_provider, is_flagged, is_banned')
+        .select(
+          'id, nickname, points, energy, created_at, signup_ip, social_provider, is_flagged, is_banned'
+        )
         .eq('is_flagged', true)
         .order('created_at', { ascending: false })
         .limit(200)
@@ -25,11 +27,14 @@ export default function FraudPage() {
   const { data: duplicateIPs } = useQuery({
     queryKey: ['duplicate-ips'],
     queryFn: async () => {
-      const { data: ipRows, error } = await supabase.rpc('admin_get_duplicate_ips', { p_min_count: 2, p_limit: 50 })
+      const { data: ipRows, error } = await supabase.rpc('admin_get_duplicate_ips', {
+        p_min_count: 2,
+        p_limit: 50,
+      })
       if (error) throw error
       if (!ipRows?.length) return []
 
-      const ips = ipRows.map(r => r.signup_ip)
+      const ips = ipRows.map((r) => r.signup_ip)
       const { data: users } = await supabase
         .from('profiles')
         .select('id, nickname, signup_ip, created_at, is_banned, is_flagged')
@@ -38,11 +43,11 @@ export default function FraudPage() {
         .limit(500)
 
       const grouped = {}
-      ;(users ?? []).forEach(u => {
+      ;(users ?? []).forEach((u) => {
         if (!grouped[u.signup_ip]) grouped[u.signup_ip] = []
         grouped[u.signup_ip].push(u)
       })
-      return ipRows.map(r => [r.signup_ip, grouped[r.signup_ip] ?? []])
+      return ipRows.map((r) => [r.signup_ip, grouped[r.signup_ip] ?? []])
     },
     enabled: tab === 'ip',
   })
@@ -91,11 +96,18 @@ export default function FraudPage() {
       <h1 className="text-2xl font-bold text-gray-900">부정이용 감지</h1>
 
       <div className="flex gap-2 border-b border-gray-200">
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === t.key ? 'border-brand text-brand' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}>{t.label}</button>
+              tab === t.key
+                ? 'border-brand text-brand'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
         ))}
       </div>
 
@@ -114,23 +126,44 @@ export default function FraudPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(flagged ?? []).map(u => (
+              {(flagged ?? []).map((u) => (
                 <tr key={u.id} className="hover:bg-red-50">
                   <td className="px-4 py-3">
-                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">{u.nickname || `ユーザー${u.id.slice(0, 4)}`}</Link>
+                    <Link
+                      to={`/admin/users/${u.id}`}
+                      className="text-brand hover:underline font-medium"
+                    >
+                      {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
+                    </Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">{u.signup_ip ?? '—'}</td>
-                  <td className="px-4 py-3 text-right font-medium">{u.points?.toLocaleString()} P</td>
-                  <td className="px-4 py-3 text-right text-gray-400 text-xs">{new Date(u.created_at).toLocaleDateString('ko-KR')}</td>
+                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                    {u.signup_ip ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium">
+                    {u.points?.toLocaleString()} P
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-400 text-xs">
+                    {new Date(u.created_at).toLocaleDateString('ko-KR')}
+                  </td>
                   <td className="px-4 py-3 text-right">
-                    {u.is_banned ? <span className="badge-red">정지</span> : <span className="badge-yellow">의심</span>}
+                    {u.is_banned ? (
+                      <span className="badge-red">정지</span>
+                    ) : (
+                      <span className="badge-yellow">의심</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex gap-2 justify-end">
-                      <button onClick={() => toggleFlag.mutate({ id: u.id, val: false })}
-                        className="text-xs text-gray-500 hover:text-gray-700">무혐의</button>
-                      <button onClick={() => toggleBan.mutate({ id: u.id, val: !u.is_banned })}
-                        className={`text-xs ${u.is_banned ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}>
+                      <button
+                        onClick={() => toggleFlag.mutate({ id: u.id, val: false })}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        무혐의
+                      </button>
+                      <button
+                        onClick={() => toggleBan.mutate({ id: u.id, val: !u.is_banned })}
+                        className={`text-xs ${u.is_banned ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}
+                      >
                         {u.is_banned ? '정지해제' : '계정정지'}
                       </button>
                     </div>
@@ -138,7 +171,11 @@ export default function FraudPage() {
                 </tr>
               ))}
               {(flagged ?? []).length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">의심 유저 없음 ✅</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    의심 유저 없음 ✅
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -155,11 +192,18 @@ export default function FraudPage() {
                 <span className="badge-red">{users.length}개 계정</span>
               </div>
               <div className="space-y-1">
-                {users.map(u => (
-                  <div key={u.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm">
-                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline">{u.nickname || `ユーザー${u.id.slice(0, 4)}`}</Link>
+                {users.map((u) => (
+                  <div
+                    key={u.id}
+                    className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm"
+                  >
+                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline">
+                      {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
+                    </Link>
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-xs">{new Date(u.created_at).toLocaleDateString('ko-KR')}</span>
+                      <span className="text-gray-400 text-xs">
+                        {new Date(u.created_at).toLocaleDateString('ko-KR')}
+                      </span>
                       {u.is_banned && <span className="badge-red text-xs">정지</span>}
                       {u.is_flagged && <span className="badge-yellow text-xs">의심</span>}
                     </div>
@@ -196,13 +240,28 @@ export default function FraudPage() {
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
                   <td className="px-4 py-3">
-                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline font-medium">{u.nickname || `ユーザー${u.id.slice(0, 4)}`}</Link>
+                    <Link
+                      to={`/admin/users/${u.id}`}
+                      className="text-brand hover:underline font-medium"
+                    >
+                      {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
+                    </Link>
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-900">{u.points?.toLocaleString()} P</td>
-                  <td className="px-4 py-3 text-right text-gray-500">{u.self_earned_points?.toLocaleString()} P</td>
-                  <td className="px-4 py-3 text-right text-gray-500">{u.energy?.toLocaleString()} E</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900">
+                    {u.points?.toLocaleString()} P
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-500">
+                    {u.self_earned_points?.toLocaleString()} P
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-500">
+                    {u.energy?.toLocaleString()} E
+                  </td>
                   <td className="px-4 py-3 text-right">
-                    {u.is_flagged ? <span className="badge-yellow">의심</span> : <span className="badge-green">정상</span>}
+                    {u.is_flagged ? (
+                      <span className="badge-yellow">의심</span>
+                    ) : (
+                      <span className="badge-green">정상</span>
+                    )}
                   </td>
                 </tr>
               ))}

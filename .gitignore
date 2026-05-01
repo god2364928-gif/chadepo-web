@@ -4,3 +4,6 @@ admin-src/.env
 
 # 어드민 빌드 산출물 (Railway 가 빌드 시 자동 생성. 사람이 손대지 말 것)
 admin/
+
+# 정리 작업 측정 로그 (커밋 대상 아님)
+admin-src/.cleanup_logs/

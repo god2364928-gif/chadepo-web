@@ -63,7 +63,12 @@ export default function AdLoadHealthTable({ period, refreshKey }) {
       {error ? (
         <div className="px-4 py-6 text-center">
           <p className="text-red-700 text-sm mb-2">불러오기 실패: {error.message}</p>
-          <button onClick={() => refetch()} className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50">다시 시도</button>
+          <button
+            onClick={() => refetch()}
+            className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
+          >
+            다시 시도
+          </button>
         </div>
       ) : isLoading ? (
         <div className="py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
@@ -98,7 +103,7 @@ export default function AdLoadHealthTable({ period, refreshKey }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rows.map(r => (
+              {rows.map((r) => (
                 <tr key={r.ad_format} className="hover:bg-gray-50">
                   <td className="px-4 py-2.5">
                     <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">
@@ -107,11 +112,15 @@ export default function AdLoadHealthTable({ period, refreshKey }) {
                   </td>
                   <td className="px-4 py-2.5 text-right text-gray-700">{formatInt(r.requested)}</td>
                   <td className="px-4 py-2.5 text-right text-gray-700">{formatInt(r.loaded)}</td>
-                  <td className={`px-4 py-2.5 text-right ${Number(r.load_failed) > 0 ? 'text-orange-500' : 'text-gray-400'}`}>
+                  <td
+                    className={`px-4 py-2.5 text-right ${Number(r.load_failed) > 0 ? 'text-orange-500' : 'text-gray-400'}`}
+                  >
                     {formatInt(r.load_failed)}
                   </td>
                   <td className="px-4 py-2.5 text-right text-gray-700">{formatInt(r.displayed)}</td>
-                  <td className={`px-4 py-2.5 text-right ${fillRateColor(r.ad_format, r.fill_rate)}`}>
+                  <td
+                    className={`px-4 py-2.5 text-right ${fillRateColor(r.ad_format, r.fill_rate)}`}
+                  >
                     {formatPct(r.fill_rate)}
                   </td>
                   <td className={`px-4 py-2.5 text-right ${successRateColor(r.success_rate)}`}>
@@ -132,7 +141,8 @@ export default function AdLoadHealthTable({ period, refreshKey }) {
             </tbody>
           </table>
           <div className="px-4 py-2.5 border-t border-gray-100 text-[11px] text-gray-400 bg-gray-50">
-            ※ Banner / MREC 는 auto-refresh (30~60초) 특성상 1 요청에서 다수 로드 이벤트가 발생합니다. fill_rate 100% 초과는 정상.
+            ※ Banner / MREC 는 auto-refresh (30~60초) 특성상 1 요청에서 다수 로드 이벤트가
+            발생합니다. fill_rate 100% 초과는 정상.
           </div>
         </div>
       )}

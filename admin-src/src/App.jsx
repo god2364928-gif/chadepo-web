@@ -15,11 +15,12 @@ import AdAnalyticsPage from './pages/ads/AdAnalyticsPage'
 
 function ProtectedRoute({ children }) {
   const { user, isAdmin, loading } = useAuth()
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-gray-500 text-sm">読み込み中...</div>
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500 text-sm">読み込み中...</div>
+      </div>
+    )
   if (!user || !isAdmin) return <Navigate to="/admin/login" replace />
   return children
 }
@@ -29,25 +30,28 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/admin/login" element={<Login />} />
-        <Route path="/admin/*" element={
-          <ProtectedRoute>
-            <Layout>
-              <Routes>
-                <Route index element={<Dashboard />} />
-                <Route path="users" element={<UserList />} />
-                <Route path="users/:id" element={<UserDetail />} />
-                <Route path="exchange" element={<ExchangePage />} />
-                <Route path="raffle" element={<RafflePage />} />
-                <Route path="fraud" element={<FraudPage />} />
-                <Route path="missions" element={<MissionsPage />} />
-                <Route path="referral" element={<ReferralPage />} />
-                <Route path="inquiry" element={<InquiryPage />} />
-                <Route path="ads" element={<AdAnalyticsPage />} />
-                <Route path="*" element={<Navigate to="/admin" replace />} />
-              </Routes>
-            </Layout>
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Routes>
+                  <Route index element={<Dashboard />} />
+                  <Route path="users" element={<UserList />} />
+                  <Route path="users/:id" element={<UserDetail />} />
+                  <Route path="exchange" element={<ExchangePage />} />
+                  <Route path="raffle" element={<RafflePage />} />
+                  <Route path="fraud" element={<FraudPage />} />
+                  <Route path="missions" element={<MissionsPage />} />
+                  <Route path="referral" element={<ReferralPage />} />
+                  <Route path="inquiry" element={<InquiryPage />} />
+                  <Route path="ads" element={<AdAnalyticsPage />} />
+                  <Route path="*" element={<Navigate to="/admin" replace />} />
+                </Routes>
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </BrowserRouter>
