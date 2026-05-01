@@ -41,6 +41,48 @@ async function countDeviceCluster(supabase, row, devCutoffIso) {
   return count ?? 0
 }
 
+/**
+ * 의심 유저들이 실제로 친구초대 시스템으로 받은 보상 합계를 user_id → 금액 맵으로 반환.
+ *  - referral_events.referee_bonus_amount (referee_bonus_granted=true)
+ *  - referral_events.referrer_bonus_amount (referrer_bonus_granted=true)
+ *  - referral_energy_bonus.bonus_amount (referrer_id 기준)
+ * 의심 플래그된 유저는 DB 차원에서 보상 차단되므로 정상이면 0 이어야 한다. 0이 아니면 "의심 걸리기 전에 받은 / 누락된 케이스" 로 수동 검토가 필요함을 의미.
+ */
+async function fetchReferralPayoutsByUser(supabase, userIds) {
+  if (!userIds.length) return {}
+
+  const totals = Object.fromEntries(userIds.map((id) => [id, 0]))
+
+  const [refereeRes, referrerRes, energyRes] = await Promise.all([
+    supabase
+      .from('referral_events')
+      .select('referee_id, referee_bonus_amount')
+      .in('referee_id', userIds)
+      .eq('referee_bonus_granted', true),
+    supabase
+      .from('referral_events')
+      .select('referrer_id, referrer_bonus_amount')
+      .in('referrer_id', userIds)
+      .eq('referrer_bonus_granted', true),
+    supabase
+      .from('referral_energy_bonus')
+      .select('referrer_id, bonus_amount')
+      .in('referrer_id', userIds),
+  ])
+
+  for (const r of refereeRes.data ?? []) {
+    if (totals[r.referee_id] != null) totals[r.referee_id] += r.referee_bonus_amount ?? 0
+  }
+  for (const r of referrerRes.data ?? []) {
+    if (totals[r.referrer_id] != null) totals[r.referrer_id] += r.referrer_bonus_amount ?? 0
+  }
+  for (const r of energyRes.data ?? []) {
+    if (totals[r.referrer_id] != null) totals[r.referrer_id] += r.bonus_amount ?? 0
+  }
+
+  return totals
+}
+
 /** 의심 유저 행에 자동 탐지 사유(기기/IP/소셜) 요약을 붙인다 */
 async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
   const now = Date.now()
@@ -167,7 +209,12 @@ export default function FraudPage() {
         .order('created_at', { ascending: false })
         .limit(200)
       if (error) throw error
-      return enrichFlaggedWithSignupAbuseReasons(supabase, data ?? [])
+      const enriched = await enrichFlaggedWithSignupAbuseReasons(supabase, data ?? [])
+      const payouts = await fetchReferralPayoutsByUser(
+        supabase,
+        enriched.map((u) => u.id),
+      )
+      return enriched.map((u) => ({ ...u, _referralPayout: payouts[u.id] ?? 0 }))
     },
     enabled: tab === 'flagged',
   })
@@ -287,6 +334,9 @@ export default function FraudPage() {
                   </th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">가입 IP</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">포인트</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium" title="referral_events 와 referral_energy_bonus 에 실제로 지급된 합계. 0이면 추천 시스템으로는 보상이 나가지 않은 안전 케이스.">
+                    추천 실수령
+                  </th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">가입일</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">처리</th>
@@ -314,6 +364,17 @@ export default function FraudPage() {
                     </td>
                     <td className="px-4 py-3 text-right align-top font-medium">
                       {u.points?.toLocaleString()} P
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
+                      {u._referralPayout > 0 ? (
+                        <span className="text-red-600 font-semibold" title="추천 시스템으로 실제 지급된 누적 금액. 0이 아니면 의심 플래그 이전에 받았거나 누락된 케이스이므로 검토 필요.">
+                          {u._referralPayout.toLocaleString()} P
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs" title="추천 시스템(피초대/초대/매일 동반)으로는 한 푼도 지급되지 않음. 의심으로 잡혀도 추천 보상 측면에서는 안전.">
+                          0 P
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right align-top text-gray-400 text-xs">
                       {new Date(u.created_at).toLocaleDateString('ko-KR')}
@@ -345,7 +406,7 @@ export default function FraudPage() {
                 ))}
                 {(flagged ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                       의심 유저 없음 ✅
                     </td>
                   </tr>
@@ -358,6 +419,12 @@ export default function FraudPage() {
             <code className="text-[11px] bg-gray-100 px-1 rounded">_try_flag_abusive_signup</code>
             )와 동일한 기준으로 계산합니다. 기기·IDFV/지문은 30일·3건 이상, 가입 IP는 24시간·5건
             이상, 동일 소셜(해시)은 30일·2건 이상일 때 의심으로 분류됩니다.
+            <br />
+            <span className="text-gray-600">
+              「추천 실수령」은 친구초대 시스템에서 실제로 지급된 누적 보상(피초대 1,000P·초대자
+              1,000P·매일 동반 에너지)의 합계입니다. 의심 플래그가 켜진 뒤에는 모든 추천 보상이
+              자동 차단되므로, 0 P이면 추천 어뷰징 측면에서는 무해한 의심 케이스입니다.
+            </span>
           </p>
         </div>
       )}
