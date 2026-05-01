@@ -4,6 +4,153 @@ import { supabase } from '../../lib/supabase'
 import { useState } from 'react'
 import GameAbuseLog from './GameAbuseLog'
 
+/** DB `public._try_flag_abusive_signup` 와 동일 상수 (마이그레이션 변경 시 여기도 맞출 것) */
+const SIGNUP_ABUSE = {
+  devWindowDays: 30,
+  devThreshold: 3,
+  ipWindowHours: 24,
+  ipThreshold: 5,
+  socialWindowDays: 30,
+  socialThreshold: 2,
+}
+
+/**
+ * 가입 시 자동 플래그와 동일한 OR 조건으로 기기 연계 계정 수를 센다.
+ * (idfv 동일 OR device_fingerprint 동일, 창구 내)
+ */
+async function countDeviceCluster(supabase, row, devCutoffIso) {
+  const idfv = row.idfv_or_ssaid
+  const dev = row.device_fingerprint
+  if (!idfv && !dev) return 0
+
+  let q = supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', devCutoffIso)
+
+  if (idfv && dev) {
+    q = q.or(`idfv_or_ssaid.eq.${idfv},device_fingerprint.eq.${dev}`)
+  } else if (idfv) {
+    q = q.eq('idfv_or_ssaid', idfv)
+  } else {
+    q = q.eq('device_fingerprint', dev)
+  }
+
+  const { count, error } = await q
+  if (error) throw error
+  return count ?? 0
+}
+
+/** 의심 유저 행에 자동 탐지 사유(기기/IP/소셜) 요약을 붙인다 */
+async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
+  const now = Date.now()
+  const devCutoff = new Date(
+    now - SIGNUP_ABUSE.devWindowDays * 24 * 60 * 60 * 1000,
+  ).toISOString()
+  const ipCutoff = new Date(now - SIGNUP_ABUSE.ipWindowHours * 60 * 60 * 1000).toISOString()
+  const socialCutoff = new Date(
+    now - SIGNUP_ABUSE.socialWindowDays * 24 * 60 * 60 * 1000,
+  ).toISOString()
+
+  return Promise.all(
+    (rows ?? []).map(async (u) => {
+      const hits = []
+      const refs = []
+
+      try {
+        const devCount = await countDeviceCluster(supabase, u, devCutoff)
+        if (devCount >= SIGNUP_ABUSE.devThreshold) {
+          hits.push(
+            `동일 기기·IDFV/지문 기준 최근 ${SIGNUP_ABUSE.devWindowDays}일 내 연계 계정 ${devCount}건 (의심 기준 ${SIGNUP_ABUSE.devThreshold}건 이상)`,
+          )
+        } else if (u.idfv_or_ssaid || u.device_fingerprint) {
+          refs.push(
+            `기기·IDFV 연계 ${devCount}건 / ${SIGNUP_ABUSE.devWindowDays}일 (기준 ${SIGNUP_ABUSE.devThreshold}건 미만)`,
+          )
+        } else {
+          refs.push('IDFV·기기 지문 없음')
+        }
+      } catch {
+        refs.push('기기 연계 집계를 불러오지 못했습니다.')
+      }
+
+      if (u.signup_ip) {
+        try {
+          const { count, error } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', ipCutoff)
+            .eq('signup_ip', u.signup_ip)
+          if (error) throw error
+          const ipCount = count ?? 0
+          if (ipCount >= SIGNUP_ABUSE.ipThreshold) {
+            hits.push(
+              `동일 가입 IP 기준 최근 ${SIGNUP_ABUSE.ipWindowHours}시간 내 ${ipCount}건 (의심 기준 ${SIGNUP_ABUSE.ipThreshold}건 이상)`,
+            )
+          } else {
+            refs.push(
+              `동일 IP ${ipCount}건 / ${SIGNUP_ABUSE.ipWindowHours}시간 (기준 ${SIGNUP_ABUSE.ipThreshold}건 미만)`,
+            )
+          }
+        } catch {
+          refs.push('IP 연계 집계를 불러오지 못했습니다.')
+        }
+      } else {
+        refs.push('가입 IP 없음(클라이언트 미전송 시 IP 규칙은 동작하지 않음)')
+      }
+
+      if (u.social_sub_hash) {
+        try {
+          const { count, error } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true })
+            .gte('created_at', socialCutoff)
+            .eq('social_sub_hash', u.social_sub_hash)
+          if (error) throw error
+          const socCount = count ?? 0
+          if (socCount >= SIGNUP_ABUSE.socialThreshold) {
+            hits.push(
+              `동일 소셜 계정(해시) 기준 최근 ${SIGNUP_ABUSE.socialWindowDays}일 내 ${socCount}건 (의심 기준 ${SIGNUP_ABUSE.socialThreshold}건 이상)`,
+            )
+          } else {
+            refs.push(
+              `동일 소셜 해시 ${socCount}건 / ${SIGNUP_ABUSE.socialWindowDays}일 (기준 ${SIGNUP_ABUSE.socialThreshold}건 미만)`,
+            )
+          }
+        } catch {
+          refs.push('소셜 해시 집계를 불러오지 못했습니다.')
+        }
+      } else {
+        refs.push('소셜 해시 없음')
+      }
+
+      let summary
+      if (hits.length) {
+        summary = hits.join('\n')
+      } else {
+        summary =
+          '현재 시점에서 자동 다중가입 탐지 임계값은 충족되지 않습니다.\n' +
+          '(수동 플래그, 또는 가입 이후 데이터·계정 수 변화 가능)\n' +
+          `참고: ${refs.join(' · ')}`
+      }
+
+      const idfv = u.idfv_or_ssaid
+      const idfvShort =
+        idfv && idfv.length > 14 ? `${idfv.slice(0, 8)}…${idfv.slice(-4)}` : idfv || '—'
+      const fpShort =
+        u.device_fingerprint && u.device_fingerprint.length > 16
+          ? `${u.device_fingerprint.slice(0, 10)}…`
+          : u.device_fingerprint || '—'
+
+      return {
+        ...u,
+        _suspicionSummary: summary,
+        _devicePreview: `IDFV/SSAID: ${idfvShort} · 지문: ${fpShort}`,
+      }
+    }),
+  )
+}
+
 export default function FraudPage() {
   const qc = useQueryClient()
   const [tab, setTab] = useState('flagged')
@@ -11,15 +158,16 @@ export default function FraudPage() {
   const { data: flagged } = useQuery({
     queryKey: ['flagged-users'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select(
-          'id, nickname, points, energy, created_at, signup_ip, social_provider, is_flagged, is_banned'
+          'id, nickname, points, energy, created_at, signup_ip, social_provider, is_flagged, is_banned, idfv_or_ssaid, device_fingerprint, social_sub_hash'
         )
         .eq('is_flagged', true)
         .order('created_at', { ascending: false })
         .limit(200)
-      return data ?? []
+      if (error) throw error
+      return enrichFlaggedWithSignupAbuseReasons(supabase, data ?? [])
     },
     enabled: tab === 'flagged',
   })
@@ -65,9 +213,18 @@ export default function FraudPage() {
     enabled: tab === 'balance',
   })
 
+  // RLS 강화 (2026_04_28) 이후 profiles.is_flagged / is_banned 는 컬럼 화이트리스트
+  // 외 컬럼이라 직접 UPDATE 시 permission denied. SECURITY DEFINER RPC 로 우회.
+  // 모든 액션은 admin_audit_log 에 자동 기록 (변경 전/후 값 + 사유).
+  // UI 사유 입력은 추후 (옵션 C). 현재는 자동 생성 문자열로 박음.
   const toggleFlag = useMutation({
     mutationFn: async ({ id, val }) => {
-      const { error } = await supabase.from('profiles').update({ is_flagged: val }).eq('id', id)
+      const reason = `auto: ${val ? 'flagged' : 'unflagged'} via admin FraudPage`
+      const { error } = await supabase.rpc('admin_set_flag', {
+        p_user_id: id,
+        p_value: val,
+        p_reason: reason,
+      })
       if (error) throw error
     },
     onSuccess: () => {
@@ -78,7 +235,13 @@ export default function FraudPage() {
 
   const toggleBan = useMutation({
     mutationFn: async ({ id, val }) => {
-      const { error } = await supabase.from('profiles').update({ is_banned: val }).eq('id', id)
+      const reason = `auto: ${val ? 'banned' : 'unbanned'} via admin FraudPage`
+      const { error } = await supabase.rpc('admin_set_ban', {
+        p_user_id: id,
+        p_value: val,
+        p_banned_reason: val ? 'admin manual ban via FraudPage' : null,
+        p_reason: reason,
+      })
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries(['flagged-users']),
@@ -113,72 +276,89 @@ export default function FraudPage() {
 
       {/* 의심 유저 탭 */}
       {tab === 'flagged' && (
-        <div className="card p-0 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">닉네임</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">가입 IP</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">포인트</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">가입일</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">처리</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(flagged ?? []).map((u) => (
-                <tr key={u.id} className="hover:bg-red-50">
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/admin/users/${u.id}`}
-                      className="text-brand hover:underline font-medium"
-                    >
-                      {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                    {u.signup_ip ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">
-                    {u.points?.toLocaleString()} P
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-400 text-xs">
-                    {new Date(u.created_at).toLocaleDateString('ko-KR')}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {u.is_banned ? (
-                      <span className="badge-red">정지</span>
-                    ) : (
-                      <span className="badge-yellow">의심</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => toggleFlag.mutate({ id: u.id, val: false })}
-                        className="text-xs text-gray-500 hover:text-gray-700"
-                      >
-                        무혐의
-                      </button>
-                      <button
-                        onClick={() => toggleBan.mutate({ id: u.id, val: !u.is_banned })}
-                        className={`text-xs ${u.is_banned ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}
-                      >
-                        {u.is_banned ? '정지해제' : '계정정지'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {(flagged ?? []).length === 0 && (
+        <div className="space-y-3">
+          <div className="card p-0 overflow-hidden overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                    의심 유저 없음 ✅
-                  </td>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">닉네임</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium w-[280px]">
+                    의심 사유 (자동 탐지)
+                  </th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">가입 IP</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">포인트</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">가입일</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">처리</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(flagged ?? []).map((u) => (
+                  <tr key={u.id} className="hover:bg-red-50">
+                    <td className="px-4 py-3 align-top">
+                      <Link
+                        to={`/admin/users/${u.id}`}
+                        className="text-brand hover:underline font-medium"
+                      >
+                        {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 align-top text-xs text-gray-700 max-w-[320px]">
+                      <div className="whitespace-pre-line leading-relaxed">{u._suspicionSummary}</div>
+                      <div className="mt-1.5 text-[11px] text-gray-400 font-mono break-all">
+                        {u._devicePreview}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top text-gray-500 font-mono text-xs">
+                      {u.signup_ip ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right align-top font-medium">
+                      {u.points?.toLocaleString()} P
+                    </td>
+                    <td className="px-4 py-3 text-right align-top text-gray-400 text-xs">
+                      {new Date(u.created_at).toLocaleDateString('ko-KR')}
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
+                      {u.is_banned ? (
+                        <span className="badge-red">정지</span>
+                      ) : (
+                        <span className="badge-yellow">의심</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => toggleFlag.mutate({ id: u.id, val: false })}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          무혐의
+                        </button>
+                        <button
+                          onClick={() => toggleBan.mutate({ id: u.id, val: !u.is_banned })}
+                          className={`text-xs ${u.is_banned ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}
+                        >
+                          {u.is_banned ? '정지해제' : '계정정지'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {(flagged ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                      의심 유저 없음 ✅
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-500 px-1 leading-relaxed">
+            사유는 DB 가입 시 자동 플래그(
+            <code className="text-[11px] bg-gray-100 px-1 rounded">_try_flag_abusive_signup</code>
+            )와 동일한 기준으로 계산합니다. 기기·IDFV/지문은 30일·3건 이상, 가입 IP는 24시간·5건
+            이상, 동일 소셜(해시)은 30일·2건 이상일 때 의심으로 분류됩니다.
+          </p>
         </div>
       )}
 
