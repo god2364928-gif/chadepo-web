@@ -21,12 +21,21 @@ export default function ReferralPage() {
       let q = supabase
         .from('referral_events')
         .select(
-          'id, referrer_id, referee_id, status, ad_watch_count, referee_bonus_granted, referee_bonus_amount, referrer_bonus_granted, referrer_bonus_amount, created_at, referrer:profiles!referrer_id(nickname), referee:profiles!referee_id(nickname)',
+          // 신정책 (2026-05-07): 광고 시청 게이트 폐지로 ad_watch_count 는
+          // 운영상 의미 없음. expires_at (=가입 시각 + 24h, 초대자 받기 만료)
+          // 와 referrer_notified_at (푸시 발송 시각) 을 대신 노출.
+          'id, referrer_id, referee_id, status, expires_at, referrer_notified_at, referee_bonus_granted, referee_bonus_amount, referrer_bonus_granted, referrer_bonus_amount, referrer_bonus_granted_at, created_at, referrer:profiles!referrer_id(nickname), referee:profiles!referee_id(nickname)',
           { count: 'exact' }
         )
         .order('created_at', { ascending: false })
         .range(page * REF_PAGE, (page + 1) * REF_PAGE - 1)
-      if (filter !== 'all') q = q.eq('status', filter)
+      // 신정책: pending 과 reward_available 은 모두 「받기 가능」 의미.
+      //   필터 'claimable' 선택 시 두 status 를 OR 로 묶어 조회.
+      if (filter === 'claimable') {
+        q = q.in('status', ['pending', 'reward_available'])
+      } else if (filter !== 'all') {
+        q = q.eq('status', filter)
+      }
       const { data, count } = await q
       return { rows: data ?? [], total: count ?? 0 }
     },
@@ -65,13 +74,44 @@ export default function ReferralPage() {
     },
   })
 
+  // 신정책 (2026-05-07): pending = 「받기 가능 (24h 안)」.
+  //   reward_available 은 구 데이터(광고 3회 게이트 시절) 잔존이지만 동일하게 표시.
   const statusBadge = (s) => {
-    if (s === 'rewarded') return <span className="badge-green">보상완료</span>
-    if (s === 'pending') return <span className="badge-yellow">대기중</span>
-    if (s === 'reward_available') return <span className="badge-yellow">받기대기</span>
+    if (s === 'rewarded') return <span className="badge-green">받기완료</span>
+    if (s === 'pending')
+      return (
+        <span className="badge-yellow" title="초대자가 24h 안에 「受け取る」 누를 수 있음">
+          받기 가능
+        </span>
+      )
+    if (s === 'reward_available')
+      return (
+        <span className="badge-yellow" title="구 데이터 (광고 게이트 시절) — pending 과 동일 처리">
+          받기 가능 (구)
+        </span>
+      )
     if (s === 'flagged') return <span className="badge-red">의심</span>
-    if (s === 'expired') return <span className="badge-gray">만료</span>
+    if (s === 'expired')
+      return (
+        <span className="badge-gray" title="24h 안에 받기 못 누름 → 자동 만료, 화면에서 숨김">
+          만료
+        </span>
+      )
     return <span className="badge-gray">{s}</span>
+  }
+
+  // 「받기 가능 만료까지」 라벨 — 신정책의 expires_at 카운트다운.
+  const formatRemainHours = (iso) => {
+    if (!iso) return '—'
+    const ms = new Date(iso).getTime() - Date.now()
+    if (ms <= 0) return <span className="text-gray-400">期限切れ</span>
+    const h = Math.floor(ms / 3600_000)
+    const m = Math.floor((ms % 3600_000) / 60_000)
+    return (
+      <span className="text-orange-600 font-medium">
+        残り {h}h {m}m
+      </span>
+    )
   }
 
   const events = eventsResult?.rows ?? []
@@ -81,7 +121,7 @@ export default function ReferralPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">추천 프로그램 관리</h1>
 
-      {/* 요약 카드 */}
+      {/* 요약 카드 (신정책 2026-05-07) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           {
@@ -93,16 +133,33 @@ export default function ReferralPage() {
               (summary?.flagged ?? 0) +
               (summary?.expired ?? 0),
             color: 'bg-white',
+            tooltip: '모든 상태 합계 (만료 포함)',
           },
-          { label: '보상 완료', value: summary?.rewarded ?? 0, color: 'bg-green-50' },
           {
-            label: '대기 중',
+            label: '받기 완료',
+            value: summary?.rewarded ?? 0,
+            color: 'bg-green-50',
+            tooltip: '초대자가 24h 안에 「受け取る」 누른 건',
+          },
+          {
+            label: '받기 가능 (24h)',
             value: (summary?.pending ?? 0) + (summary?.reward_available ?? 0),
             color: 'bg-yellow-50',
+            tooltip:
+              '친구가 가입했으나 초대자가 아직 받기 누르지 않은 건. 24h 지나면 자동 만료',
           },
-          { label: '의심 건', value: summary?.flagged ?? 0, color: 'bg-red-50' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className={`${color} rounded-xl border border-gray-200 p-4`}>
+          {
+            label: '의심 건',
+            value: summary?.flagged ?? 0,
+            color: 'bg-red-50',
+            tooltip: '어뷰저 자동 플래그 건 (보상 차단)',
+          },
+        ].map(({ label, value, color, tooltip }) => (
+          <div
+            key={label}
+            className={`${color} rounded-xl border border-gray-200 p-4`}
+            title={tooltip}
+          >
             <div className="text-2xl font-bold text-gray-900">{value}</div>
             <div className="text-sm text-gray-500 mt-1">{label}</div>
           </div>
@@ -115,9 +172,8 @@ export default function ReferralPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {[
               ['all', '전체'],
-              ['pending', '대기중'],
-              ['reward_available', '받기대기'],
-              ['rewarded', '완료'],
+              ['claimable', '받기 가능 (24h)'],
+              ['rewarded', '받기 완료'],
               ['flagged', '의심'],
               ['expired', '만료'],
             ].map(([v, l]) => (
@@ -143,10 +199,21 @@ export default function ReferralPage() {
                 <tr>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">초대한 사람</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">초대받은 사람</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">광고</th>
+                  <th
+                    className="text-right px-4 py-3 text-gray-500 font-medium"
+                    title="신정책: 24h 안에 초대자가 받기 누르지 않으면 자동 만료"
+                  >
+                    받기 만료까지
+                  </th>
+                  <th
+                    className="text-right px-4 py-3 text-gray-500 font-medium"
+                    title="초대자 푸시 발송 시각 (NULL = 미전송)"
+                  >
+                    푸시
+                  </th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">보상(초대자)</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">보상(신규)</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">날짜</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">가입일</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">처리</th>
                 </tr>
@@ -173,8 +240,41 @@ export default function ReferralPage() {
                         {e.referee?.nickname || `ユーザー${e.referee_id?.slice(0, 4)}`}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-right text-xs text-gray-600">
-                      {e.ad_watch_count ?? 0}회
+                    <td className="px-4 py-3 text-right text-xs whitespace-nowrap">
+                      {e.status === 'pending' || e.status === 'reward_available'
+                        ? formatRemainHours(e.expires_at)
+                        : e.status === 'rewarded' ? (
+                            <span
+                              className="text-gray-400"
+                              title={
+                                e.referrer_bonus_granted_at
+                                  ? `받기 시각: ${new Date(
+                                      e.referrer_bonus_granted_at,
+                                    ).toLocaleString('ko-KR')}`
+                                  : ''
+                              }
+                            >
+                              완료
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs">
+                      {e.referrer_notified_at ? (
+                        <span
+                          className="text-green-600"
+                          title={`푸시 발송: ${new Date(
+                            e.referrer_notified_at,
+                          ).toLocaleString('ko-KR')}`}
+                        >
+                          ✓
+                        </span>
+                      ) : (
+                        <span className="text-gray-300" title="푸시 미전송 (수신거부/토큰없음/실패)">
+                          —
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-xs">
                       {e.referrer_bonus_granted ? (
@@ -220,7 +320,7 @@ export default function ReferralPage() {
                 ))}
                 {events.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
                       내역 없음
                     </td>
                   </tr>

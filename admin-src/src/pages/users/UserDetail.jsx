@@ -345,8 +345,12 @@ export default function UserDetail() {
               <div className="text-2xl font-bold text-orange-700 mt-1">
                 {user.points?.toLocaleString()} P
               </div>
-              <div className="text-xs text-orange-400 mt-0.5">
+              <div
+                className="text-xs text-orange-400 mt-0.5"
+                title="신정책 (2026-05-07): 교환 시 자체획득 1,000P 게이트 폐지. 본 수치는 참고용 누적값."
+              >
                 자체획득: {user.self_earned_points?.toLocaleString()} P
+                <span className="ml-1 text-[10px] text-gray-400">(참고용)</span>
               </div>
             </div>
             <div className="bg-blue-50 rounded-lg p-4">
