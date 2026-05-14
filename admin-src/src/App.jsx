@@ -12,6 +12,8 @@ import MissionsPage from './pages/missions/MissionsPage'
 import ReferralPage from './pages/referral/ReferralPage'
 import InquiryPage from './pages/inquiry/InquiryPage'
 import AdAnalyticsPage from './pages/ads/AdAnalyticsPage'
+import DartThrowsPage from './pages/dart/DartThrowsPage'
+import AccountLifecyclePage from './pages/users/AccountLifecyclePage'
 
 function ProtectedRoute({ children }) {
   const { user, isAdmin, loading } = useAuth()
@@ -39,6 +41,7 @@ export default function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="users" element={<UserList />} />
                   <Route path="users/:id" element={<UserDetail />} />
+                  <Route path="account-lifecycle" element={<AccountLifecyclePage />} />
                   <Route path="exchange" element={<ExchangePage />} />
                   <Route path="raffle" element={<RafflePage />} />
                   <Route path="fraud" element={<FraudPage />} />
@@ -46,6 +49,7 @@ export default function App() {
                   <Route path="referral" element={<ReferralPage />} />
                   <Route path="inquiry" element={<InquiryPage />} />
                   <Route path="ads" element={<AdAnalyticsPage />} />
+                  <Route path="dart" element={<DartThrowsPage />} />
                   <Route path="*" element={<Navigate to="/admin" replace />} />
                 </Routes>
               </Layout>
