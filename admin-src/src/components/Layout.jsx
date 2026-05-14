@@ -4,10 +4,12 @@ import { useAuth } from '../contexts/AuthContext'
 const nav = [
   { to: '/admin', label: '대시보드', icon: '📊', exact: true },
   { to: '/admin/users', label: '사용자 관리', icon: '👤' },
+  { to: '/admin/account-lifecycle', label: '계정 정지/삭제', icon: '🗑️' },
   { to: '/admin/exchange', label: '교환 관리', icon: '🎁' },
   { to: '/admin/raffle', label: '응모/추첨', icon: '🎰' },
   { to: '/admin/fraud', label: '부정 이용 탐지', icon: '🚨' },
   { to: '/admin/missions', label: '게임/미션', icon: '🎮' },
+  { to: '/admin/dart', label: 'ダーツ', icon: '🎯' },
   { to: '/admin/referral', label: '추천 프로그램', icon: '🔗' },
   { to: '/admin/inquiry', label: '문의 관리', icon: '💬' },
   { to: '/admin/ads', label: '광고 분석', icon: '📺' },

@@ -20,7 +20,7 @@ const QUESTS = [
   },
   { key: 'feed_20', icon: '🍚', title: 'ごはんを20回', desc: '万歩計でキャラにごはんを20回あげる' },
   { key: 'raffle_20', icon: '🎰', title: 'くじを20回', desc: 'くじ・抽選を合計20回行う' },
-  { key: 'sanpo', icon: '🐾', title: 'お散歩3マス', desc: '1日に3,000歩以上歩く' },
+  { key: 'sanpo', icon: '🐾', title: 'お散歩で2マス進む', desc: '散歩道を2マス進む (≒2,000歩 以上)' },
 ]
 
 const GAME_TYPE_LABELS = {
@@ -64,6 +64,12 @@ const TIER_META = {
   medium: { label: 'ふつう', cls: 'bg-yellow-100 text-yellow-700' },
   long: { label: 'むずかしい', cls: 'bg-red-100 text-red-700' },
 }
+
+// おすすめゲーム 신정책 (2026-05-14): プール = short tier 6種, 매일 1종 선정
+// 근거: chadepo-app/sql/migrations/2026_05_14_recommended_short_only.sql
+const RECOMMENDED_POOL = Object.entries(GAME_TIER)
+  .filter(([, tier]) => tier === 'short')
+  .map(([key]) => key)
 
 const LOG_SIZE = 50
 
@@ -437,6 +443,22 @@ export default function MissionsPage() {
                 </div>
               </div>
 
+              {/* おすすめゲーム 신정책 안내 (2026-05-14~) */}
+              <div className="card bg-orange-50/50 border border-orange-200/60">
+                <div className="flex items-start gap-2">
+                  <span className="text-base">🔥</span>
+                  <div className="text-xs text-gray-700 leading-relaxed">
+                    <span className="font-semibold text-orange-700">
+                      おすすめゲーム 정책 (2026-05-14~)
+                    </span>
+                    <span className="ml-2 text-gray-500">
+                      매일 <b>かんたん(short) 6종 중 1종</b>만 おすすめ로 선정 (이전: 全 tier 10종 중 2종).
+                      下表에서 🔥 배지가 추천 풀, 추천 보너스(+)는 그날 선정된 1종에서만 발생.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {/* 게임별 집계 테이블 */}
               <div className="card p-0 overflow-hidden">
                 <table className="w-full text-sm">
@@ -466,6 +488,10 @@ export default function MissionsPage() {
                     {(gameStats ?? []).map((g) => {
                       const tier = GAME_TIER[g.game_type]
                       const tm = TIER_META[tier]
+                      const inPool = RECOMMENDED_POOL.includes(g.game_type)
+                      const hasBonus = Number(g.total_bonus) > 0
+                      // 신정책 위반: non-short인데 보너스 발생 = 구 정책 데이터 (2026-05-14 이전 또는 정책 위반)
+                      const isLegacyBonus = !inPool && hasBonus
                       return (
                         <tr key={g.game_type} className="hover:bg-gray-50">
                           <td className="px-4 py-2.5">
@@ -475,6 +501,14 @@ export default function MissionsPage() {
                                   className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${tm.cls}`}
                                 >
                                   {tm.label}
+                                </span>
+                              )}
+                              {inPool && (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 bg-orange-100 text-orange-700"
+                                  title="おすすめゲーム 풀 (short tier 6종)"
+                                >
+                                  🔥 추천 풀
                                 </span>
                               )}
                               <span className="text-xs text-gray-700">
@@ -491,10 +525,26 @@ export default function MissionsPage() {
                           <td className="px-4 py-2.5 text-right text-green-600 font-medium">
                             +{Number(g.total_points).toLocaleString()} P
                           </td>
-                          <td className="px-4 py-2.5 text-right text-orange-500">
-                            {Number(g.total_bonus) > 0
-                              ? `+${Number(g.total_bonus).toLocaleString()}`
-                              : '—'}
+                          <td className="px-4 py-2.5 text-right">
+                            {hasBonus ? (
+                              <span
+                                className={
+                                  isLegacyBonus ? 'text-gray-400 line-through' : 'text-orange-500'
+                                }
+                                title={
+                                  isLegacyBonus
+                                    ? '구 정책 잔재 (2026-05-14 이전): 현재는 추천 풀이 아님'
+                                    : undefined
+                                }
+                              >
+                                +{Number(g.total_bonus).toLocaleString()}
+                                {isLegacyBonus && (
+                                  <span className="ml-1 text-[10px] not-italic">⚠️</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-2.5 text-right text-gray-400">
                             {Number(g.total_energy).toLocaleString()} ⚡
