@@ -149,7 +149,7 @@ export default function RafflePage() {
       })
       if (error) throw new Error(error.message)
     },
-    onSuccess: () => qc.invalidateQueries(['raffle-winners', selectedRound?.id]),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['raffle-winners', selectedRound?.id] }),
   })
 
   const [pickError, setPickError] = useState('')
@@ -164,7 +164,7 @@ export default function RafflePage() {
     },
     onSuccess: () => {
       setPickError('')
-      qc.invalidateQueries(['raffle-rounds', selectedItemId])
+      qc.invalidateQueries({ queryKey: ['raffle-rounds', selectedItemId] })
     },
     onError: (err) => setPickError(err.message),
   })
@@ -198,8 +198,8 @@ export default function RafflePage() {
     },
     onSuccess: () => {
       setPickError('')
-      qc.invalidateQueries(['raffle-rounds', selectedItemId])
-      qc.invalidateQueries(['raffle-winners', selectedRound?.id])
+      qc.invalidateQueries({ queryKey: ['raffle-rounds', selectedItemId] })
+      qc.invalidateQueries({ queryKey: ['raffle-winners', selectedRound?.id] })
     },
     onError: (err) => setPickError(err.message),
   })
@@ -224,7 +224,7 @@ export default function RafflePage() {
   const uniqueUsers = entriesTotal
   const selectedItem = items?.find((i) => i.id === selectedItemId)
   const prizeValue = selectedItem?.prize_value ?? 0
-  // 100P 만 자동 추첨, 그 외(5천/1만/100万)는 어드민 직접 지정 + 「지급 완료 처리」 수동
+  // 100P 만 자동 추첨, 그 외(5천/1만/100万)는 어드민 직접 지정 + 앱 「受け取る」 self-claim
   const isManualItem = prizeValue > AUTO_DRAW_MAX_PRIZE
   const targetReached = targetEntries > 0 && totalTickets >= targetEntries
   const canPickWinner = isManualItem && selectedRound?.status === 'drawing'

@@ -14,6 +14,7 @@ import InquiryPage from './pages/inquiry/InquiryPage'
 import AdAnalyticsPage from './pages/ads/AdAnalyticsPage'
 import DartThrowsPage from './pages/dart/DartThrowsPage'
 import AccountLifecyclePage from './pages/users/AccountLifecyclePage'
+import CampaignsPage from './pages/campaigns/CampaignsPage'
 
 function ProtectedRoute({ children }) {
   const { user, isAdmin, loading } = useAuth()
@@ -50,6 +51,7 @@ export default function App() {
                   <Route path="inquiry" element={<InquiryPage />} />
                   <Route path="ads" element={<AdAnalyticsPage />} />
                   <Route path="dart" element={<DartThrowsPage />} />
+                  <Route path="campaigns" element={<CampaignsPage />} />
                   <Route path="*" element={<Navigate to="/admin" replace />} />
                 </Routes>
               </Layout>

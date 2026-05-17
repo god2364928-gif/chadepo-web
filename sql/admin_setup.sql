@@ -169,7 +169,7 @@ BEGIN
     'pending_exchanges', (SELECT COUNT(*) FROM exchange_requests WHERE status = 'pending'),
     'today_points_issued', (SELECT COALESCE(SUM(amount),0) FROM point_logs WHERE amount > 0 AND created_at::date = CURRENT_DATE),
     'today_energy_issued', (SELECT COALESCE(SUM(amount),0) FROM energy_logs WHERE amount > 0 AND created_at::date = CURRENT_DATE),
-    'active_raffle_rounds', (SELECT COUNT(*) FROM raffle_rounds WHERE status = 'open')
+    'active_raffle_rounds', (SELECT COUNT(*) FROM raffle_rounds WHERE status = 'active')
   ) INTO v;
   RETURN v;
 END;

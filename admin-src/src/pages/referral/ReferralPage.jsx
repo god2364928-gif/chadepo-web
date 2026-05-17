@@ -69,8 +69,8 @@ export default function ReferralPage() {
       if (error) throw error
     },
     onSuccess: () => {
-      qc.invalidateQueries(['referral-events'])
-      qc.invalidateQueries(['referral-summary'])
+      qc.invalidateQueries({ queryKey: ['referral-events'] })
+      qc.invalidateQueries({ queryKey: ['referral-summary'] })
     },
   })
 

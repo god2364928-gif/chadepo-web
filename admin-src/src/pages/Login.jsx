@@ -1,30 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
 export default function Login() {
-  const { login } = useAuth()
-  const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      await login(email, password)
-      navigate('/admin')
-    } catch {
-      setError('メールアドレスまたはパスワードが正しくありません。')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function handleGoogle() {
     setGoogleLoading(true)
@@ -48,7 +27,6 @@ export default function Login() {
         </div>
 
         <div className="card shadow-sm space-y-4">
-          {/* 구글 로그인 */}
           <button
             onClick={handleGoogle}
             disabled={googleLoading}
@@ -75,38 +53,7 @@ export default function Login() {
             {googleLoading ? '移動中...' : 'Googleアカウントでログイン'}
           </button>
 
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400">またはメールで</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
-              <input
-                type="email"
-                className="input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">パスワード</label>
-              <input
-                type="password"
-                className="input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-              />
-            </div>
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? 'ログイン中...' : 'ログイン'}
-            </button>
-          </form>
+          {error && <p className="text-red-600 text-sm text-center">{error}</p>}
         </div>
       </div>
     </div>
