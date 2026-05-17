@@ -35,13 +35,6 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  async function login(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
-    await checkAdmin(data.user)
-    return data
-  }
-
   async function logout() {
     await supabase.auth.signOut()
     setUser(null)
@@ -49,7 +42,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, logout }}>
       {children}
     </AuthContext.Provider>
   )

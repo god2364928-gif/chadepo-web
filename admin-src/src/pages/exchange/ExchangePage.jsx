@@ -34,7 +34,7 @@ function ItemModal({ item, onClose }) {
     const { error } = await q
     setLoading(false)
     if (!error) {
-      qc.invalidateQueries(['exchange-items'])
+      qc.invalidateQueries({ queryKey: ['exchange-items'] })
       onClose()
     }
   }
@@ -181,7 +181,7 @@ export default function ExchangePage() {
         .eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries(['exchange-requests', filter]),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['exchange-requests', filter] }),
   })
 
   const toggleActive = useMutation({
@@ -192,7 +192,7 @@ export default function ExchangePage() {
         .eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries(['exchange-items']),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['exchange-items'] }),
   })
 
   return (

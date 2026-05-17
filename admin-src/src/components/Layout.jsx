@@ -13,6 +13,7 @@ const nav = [
   { to: '/admin/referral', label: '추천 프로그램', icon: '🔗' },
   { to: '/admin/inquiry', label: '문의 관리', icon: '💬' },
   { to: '/admin/ads', label: '광고 분석', icon: '📺' },
+  { to: '/admin/campaigns', label: '푸시 캠페인', icon: '📣' },
 ]
 
 export default function Layout({ children }) {

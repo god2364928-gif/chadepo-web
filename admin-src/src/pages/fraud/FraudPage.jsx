@@ -70,6 +70,11 @@ async function fetchReferralPayoutsByUser(supabase, userIds) {
       .in('referrer_id', userIds),
   ])
 
+  // 권한/네트워크 오류가 0 P 로 둔갑하면 부정이용 판단이 오염되므로 명시적으로 throw.
+  if (refereeRes.error) throw refereeRes.error
+  if (referrerRes.error) throw referrerRes.error
+  if (energyRes.error) throw energyRes.error
+
   for (const r of refereeRes.data ?? []) {
     if (totals[r.referee_id] != null) totals[r.referee_id] += r.referee_bonus_amount ?? 0
   }
@@ -197,7 +202,11 @@ export default function FraudPage() {
   const qc = useQueryClient()
   const [tab, setTab] = useState('flagged')
 
-  const { data: flagged } = useQuery({
+  const {
+    data: flagged,
+    isLoading: flaggedLoading,
+    error: flaggedError,
+  } = useQuery({
     queryKey: ['flagged-users'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -219,7 +228,11 @@ export default function FraudPage() {
     enabled: tab === 'flagged',
   })
 
-  const { data: duplicateIPs } = useQuery({
+  const {
+    data: duplicateIPs,
+    isLoading: duplicateIPsLoading,
+    error: duplicateIPsError,
+  } = useQuery({
     queryKey: ['duplicate-ips'],
     queryFn: async () => {
       const { data: ipRows, error } = await supabase.rpc('admin_get_duplicate_ips', {
@@ -230,31 +243,42 @@ export default function FraudPage() {
       if (!ipRows?.length) return []
 
       const ips = ipRows.map((r) => r.signup_ip)
-      const { data: users } = await supabase
+      const { data: users, error: usersError } = await supabase
         .from('profiles')
         .select('id, nickname, signup_ip, created_at, is_banned, is_flagged')
         .in('signup_ip', ips)
         .order('signup_ip')
         .limit(500)
+      if (usersError) throw usersError
 
       const grouped = {}
       ;(users ?? []).forEach((u) => {
         if (!grouped[u.signup_ip]) grouped[u.signup_ip] = []
         grouped[u.signup_ip].push(u)
       })
-      return ipRows.map((r) => [r.signup_ip, grouped[r.signup_ip] ?? []])
+      // RPC 의 account_count(=DB 실측) 와 500 limit 으로 잘려서 들고온 users 를 분리해 표시.
+      return ipRows.map((r) => ({
+        ip: r.signup_ip,
+        dbCount: r.account_count ?? null,
+        users: grouped[r.signup_ip] ?? [],
+      }))
     },
     enabled: tab === 'ip',
   })
 
-  const { data: highBalance } = useQuery({
+  const {
+    data: highBalance,
+    isLoading: highBalanceLoading,
+    error: highBalanceError,
+  } = useQuery({
     queryKey: ['high-balance'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('id, nickname, points, energy, self_earned_points, created_at, is_flagged')
         .order('points', { ascending: false })
         .limit(30)
+      if (error) throw error
       return data ?? []
     },
     enabled: tab === 'balance',
@@ -275,8 +299,8 @@ export default function FraudPage() {
       if (error) throw error
     },
     onSuccess: () => {
-      qc.invalidateQueries(['flagged-users'])
-      qc.invalidateQueries(['duplicate-ips'])
+      qc.invalidateQueries({ queryKey: ['flagged-users'] })
+      qc.invalidateQueries({ queryKey: ['duplicate-ips'] })
     },
   })
 
@@ -291,7 +315,7 @@ export default function FraudPage() {
       })
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries(['flagged-users']),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['flagged-users'] }),
   })
 
   const tabs = [
@@ -301,9 +325,35 @@ export default function FraudPage() {
     { key: 'game_abuse', label: '🎮 게임 어뷰징 로그' },
   ]
 
+  // mutation 실패가 콘솔에만 남고 운영자에게 안 보이면 "버튼 눌렀는데 상태가 안 바뀐다"
+  // 식의 혼란이 생기므로, 한쪽이라도 error 가 있으면 페이지 상단에 배너로 표면화한다.
+  const actionError = toggleFlag.error ?? toggleBan.error
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">부정이용 감지</h1>
+
+      {actionError && (
+        <div className="card border border-red-300 bg-red-50 text-red-700 text-sm flex items-start justify-between gap-3">
+          <div>
+            <strong>액션 실패:</strong> {actionError.message ?? '알 수 없는 오류'}
+            <div className="text-xs text-red-500 mt-1">
+              audit log 에는 시도 자체가 기록되지 않았을 수 있습니다. 권한/네트워크 확인 후 다시
+              시도하세요.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              toggleFlag.reset()
+              toggleBan.reset()
+            }}
+            className="text-xs text-red-600 hover:text-red-800 shrink-0"
+          >
+            닫기
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-2 border-b border-gray-200">
         {tabs.map((t) => (
@@ -389,14 +439,33 @@ export default function FraudPage() {
                     <td className="px-4 py-3 text-right align-top">
                       <div className="flex gap-2 justify-end">
                         <button
-                          onClick={() => toggleFlag.mutate({ id: u.id, val: false })}
-                          className="text-xs text-gray-500 hover:text-gray-700"
+                          onClick={() => {
+                            const label = u.nickname || `ユーザー${u.id.slice(0, 4)}`
+                            if (
+                              window.confirm(
+                                `「${label}」을(를) 무혐의 처리하시겠습니까?\n의심 플래그를 해제합니다. (audit log 에 기록됨)`,
+                              )
+                            ) {
+                              toggleFlag.mutate({ id: u.id, val: false })
+                            }
+                          }}
+                          disabled={toggleFlag.isPending}
+                          className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-40"
                         >
                           무혐의
                         </button>
                         <button
-                          onClick={() => toggleBan.mutate({ id: u.id, val: !u.is_banned })}
-                          className={`text-xs ${u.is_banned ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}
+                          onClick={() => {
+                            const label = u.nickname || `ユーザー${u.id.slice(0, 4)}`
+                            const msg = u.is_banned
+                              ? `「${label}」의 계정정지를 해제하시겠습니까?\n해제 후 즉시 로그인/포인트 사용이 가능해집니다.`
+                              : `「${label}」을(를) 계정정지하시겠습니까?\n즉시 적용됩니다. (audit log 에 기록됨)`
+                            if (window.confirm(msg)) {
+                              toggleBan.mutate({ id: u.id, val: !u.is_banned })
+                            }
+                          }}
+                          disabled={toggleBan.isPending}
+                          className={`text-xs disabled:opacity-40 ${u.is_banned ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}
                         >
                           {u.is_banned ? '정지해제' : '계정정지'}
                         </button>
@@ -404,7 +473,22 @@ export default function FraudPage() {
                     </td>
                   </tr>
                 ))}
-                {(flagged ?? []).length === 0 && (
+                {flaggedLoading && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                      불러오는 중…
+                    </td>
+                  </tr>
+                )}
+                {flaggedError && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-red-600">
+                      의심 유저 목록을 불러오지 못했습니다 (
+                      {flaggedError.message ?? '알 수 없는 오류'}). 권한/네트워크 상태를 확인하세요.
+                    </td>
+                  </tr>
+                )}
+                {!flaggedLoading && !flaggedError && (flagged ?? []).length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                       의심 유저 없음 ✅
@@ -432,34 +516,53 @@ export default function FraudPage() {
       {/* 중복 IP 탭 */}
       {tab === 'ip' && (
         <div className="space-y-4">
-          {(duplicateIPs ?? []).map(([ip, users]) => (
-            <div key={ip} className="card">
-              <div className="flex items-center gap-3 mb-3">
-                <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">{ip}</code>
-                <span className="badge-red">{users.length}개 계정</span>
-              </div>
-              <div className="space-y-1">
-                {users.map((u) => (
-                  <div
-                    key={u.id}
-                    className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm"
-                  >
-                    <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline">
-                      {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
-                    </Link>
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-xs">
-                        {new Date(u.created_at).toLocaleDateString('ko-KR')}
-                      </span>
-                      {u.is_banned && <span className="badge-red text-xs">정지</span>}
-                      {u.is_flagged && <span className="badge-yellow text-xs">의심</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {duplicateIPsLoading && (
+            <div className="card text-center text-gray-400 py-8">불러오는 중…</div>
+          )}
+          {duplicateIPsError && (
+            <div className="card text-center text-red-600 py-8">
+              중복 IP 목록을 불러오지 못했습니다 (
+              {duplicateIPsError.message ?? '알 수 없는 오류'}). 권한/네트워크 상태를 확인하세요.
             </div>
-          ))}
-          {(duplicateIPs ?? []).length === 0 && (
+          )}
+          {!duplicateIPsLoading &&
+            !duplicateIPsError &&
+            (duplicateIPs ?? []).map(({ ip, dbCount, users }) => (
+              <div key={ip} className="card">
+                <div className="flex items-center gap-3 mb-3 flex-wrap">
+                  <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">{ip}</code>
+                  <span className="badge-red">DB 기준 {dbCount ?? '?'}개 계정</span>
+                  {dbCount != null && users.length !== dbCount && (
+                    <span
+                      className="text-xs text-gray-500"
+                      title="목록은 최대 500건까지만 표시합니다 (IP 그룹 단위 정렬). DB 실측 카운트와 다를 수 있습니다."
+                    >
+                      표시 {users.length}건
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {users.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0 text-sm"
+                    >
+                      <Link to={`/admin/users/${u.id}`} className="text-brand hover:underline">
+                        {u.nickname || `ユーザー${u.id.slice(0, 4)}`}
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 text-xs">
+                          {new Date(u.created_at).toLocaleDateString('ko-KR')}
+                        </span>
+                        {u.is_banned && <span className="badge-red text-xs">정지</span>}
+                        {u.is_flagged && <span className="badge-yellow text-xs">의심</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          {!duplicateIPsLoading && !duplicateIPsError && (duplicateIPs ?? []).length === 0 && (
             <div className="card text-center text-gray-400 py-8">중복 IP 탐지 없음 ✅</div>
           )}
         </div>
@@ -483,6 +586,28 @@ export default function FraudPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
+              {highBalanceLoading && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    불러오는 중…
+                  </td>
+                </tr>
+              )}
+              {highBalanceError && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-red-600">
+                    고액 보유자 목록을 불러오지 못했습니다 (
+                    {highBalanceError.message ?? '알 수 없는 오류'}).
+                  </td>
+                </tr>
+              )}
+              {!highBalanceLoading && !highBalanceError && (highBalance ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    대상 없음
+                  </td>
+                </tr>
+              )}
               {(highBalance ?? []).map((u, i) => (
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>

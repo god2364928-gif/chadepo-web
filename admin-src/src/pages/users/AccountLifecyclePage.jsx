@@ -101,7 +101,7 @@ export default function AccountLifecyclePage() {
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold text-gray-900">계정 삭제 로그</h2>
-          <div className="text-xs text-gray-400 flex gap-3">
+          <div className="text-xs text-gray-400 flex gap-3 items-center">
             <span>
               requested <b className="text-yellow-700">{counts.requested}</b>
             </span>
@@ -110,6 +110,9 @@ export default function AccountLifecyclePage() {
             </span>
             <span>
               purged <b className="text-red-700">{counts.purged}</b>
+            </span>
+            <span className="text-[10px] text-gray-300" title="RPC 최대 limit 안에서 잡힌 행만 카운트한 값입니다. 전체 누적값이 아닙니다.">
+              (표시된 {logs?.length ?? 0}건 기준)
             </span>
           </div>
         </div>
@@ -179,7 +182,7 @@ export default function AccountLifecyclePage() {
                 총 {logs.length.toLocaleString()}건 (최신순)
               </span>
               <span className="text-[10px] text-gray-400">
-                ※ purge 후엔 user_id가 NULL 이고 nickname 도 사라집니다
+                ※ purge 된 행은 profiles 가 삭제되어 상세를 열 수 없으므로 (purged) 로 표시됩니다
               </span>
             </div>
             <div className="overflow-x-auto">
@@ -211,15 +214,18 @@ export default function AccountLifecyclePage() {
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-xs">
-                          {r.user_id ? (
+                          {/* purge 후엔 profiles row 가 사라져 상세 페이지가 404 가 된다.
+                              account_deletion_log.user_id 는 FK 가 없어 그대로 살아남으므로
+                              action 으로 분기해 링크를 박지 않는다. */}
+                          {r.action === 'purged' || !r.user_id ? (
+                            <span className="text-gray-400 italic">(purged)</span>
+                          ) : (
                             <Link
                               to={`/admin/users/${r.user_id}`}
                               className="text-brand hover:underline font-medium"
                             >
                               {r.nickname ?? `user-${r.user_id.slice(0, 4)}`}
                             </Link>
-                          ) : (
-                            <span className="text-gray-400 italic">(purged)</span>
                           )}
                         </td>
                         <td className="px-4 py-2.5 text-xs text-gray-500 font-mono">
