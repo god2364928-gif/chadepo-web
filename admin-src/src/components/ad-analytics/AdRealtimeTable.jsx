@@ -1,33 +1,47 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { supabase } from '../../lib/supabase'
 import { formatJstDateTime, formatUsd } from '../../utils/jstFormat'
 
-const PRESETS = [
-  { id: 5, label: '5분' },
-  { id: 15, label: '15분' },
-  { id: 60, label: '1시간' },
-  { id: 360, label: '6시간' },
-  { id: 1440, label: '24시간' },
-]
-
-const EVENT_LABELS = {
-  requested: { ja: '요청', cls: 'bg-gray-100 text-gray-600' },
-  loaded: { ja: '로드', cls: 'bg-blue-50 text-blue-700' },
-  load_failed: { ja: '로드실패', cls: 'bg-red-50 text-red-700' },
-  displayed: { ja: '표시', cls: 'bg-indigo-50 text-indigo-700' },
-  clicked: { ja: '클릭', cls: 'bg-purple-50 text-purple-700' },
-  hidden: { ja: '닫힘', cls: 'bg-gray-100 text-gray-500' },
-  rewarded: { ja: '리워드', cls: 'bg-yellow-50 text-yellow-700 font-medium' },
-  display_failed: { ja: '표시실패', cls: 'bg-red-50 text-red-700' },
-  revenue_paid: { ja: '수익발생', cls: 'bg-green-50 text-green-700 font-medium' },
+const EVENT_STYLES = {
+  requested: { cls: 'bg-gray-100 text-gray-600' },
+  loaded: { cls: 'bg-blue-50 text-blue-700' },
+  load_failed: { cls: 'bg-red-50 text-red-700' },
+  displayed: { cls: 'bg-indigo-50 text-indigo-700' },
+  clicked: { cls: 'bg-purple-50 text-purple-700' },
+  hidden: { cls: 'bg-gray-100 text-gray-500' },
+  rewarded: { cls: 'bg-yellow-50 text-yellow-700 font-medium' },
+  display_failed: { cls: 'bg-red-50 text-red-700' },
+  revenue_paid: { cls: 'bg-green-50 text-green-700 font-medium' },
 }
 
 export default function AdRealtimeTable({ refreshKey: parentRefreshKey }) {
+  const { t } = useLanguage()
   const [minutes, setMinutes] = useState(60)
   const [localRefreshKey, setLocalRefreshKey] = useState(0)
   const refreshKey = `${parentRefreshKey}_${localRefreshKey}`
+
+  const PRESETS = [
+    { id: 5, label: t('ads.realtime.preset.5m') },
+    { id: 15, label: t('ads.realtime.preset.15m') },
+    { id: 60, label: t('ads.realtime.preset.1h') },
+    { id: 360, label: t('ads.realtime.preset.6h') },
+    { id: 1440, label: t('ads.realtime.preset.24h') },
+  ]
+
+  const EVENT_LABEL_KEYS = {
+    requested: t('ads.realtime.event.requested'),
+    loaded: t('ads.realtime.event.loaded'),
+    load_failed: t('ads.realtime.event.loadFailed'),
+    displayed: t('ads.realtime.event.displayed'),
+    clicked: t('ads.realtime.event.clicked'),
+    hidden: t('ads.realtime.event.hidden'),
+    rewarded: t('ads.realtime.event.rewarded'),
+    display_failed: t('ads.realtime.event.displayFailed'),
+    revenue_paid: t('ads.realtime.event.revenuePaid'),
+  }
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['ad_realtime', minutes, refreshKey],
@@ -47,7 +61,7 @@ export default function AdRealtimeTable({ refreshKey: parentRefreshKey }) {
       {/* 컨트롤 행 */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">최근</span>
+          <span className="text-xs text-gray-500">{t('ads.realtime.recent')}</span>
           {PRESETS.map((p) => (
             <button
               key={p.id}
@@ -70,48 +84,48 @@ export default function AdRealtimeTable({ refreshKey: parentRefreshKey }) {
           disabled={isFetching}
           className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
-          🔄 {isFetching ? '불러오는 중...' : '새로고침'}
+          🔄 {isFetching ? t('common.loading') : t('common.refresh')}
         </button>
       </div>
 
       <div className="card p-0 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900 text-sm">최근 이벤트</h2>
-          <span className="text-xs text-gray-400">최대 100건 · 시간 역순 (JST)</span>
+          <h2 className="font-semibold text-gray-900 text-sm">{t('ads.realtime.title')}</h2>
+          <span className="text-xs text-gray-400">{t('ads.realtime.subtitle')}</span>
         </div>
         {error ? (
           <div className="px-4 py-6 text-center">
-            <p className="text-red-700 text-sm mb-2">불러오기 실패: {error.message}</p>
+            <p className="text-red-700 text-sm mb-2">{t('common.loadFailed')}: {error.message}</p>
             <button
               onClick={() => refetch()}
               className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
             >
-              다시 시도
+              {t('common.retry')}
             </button>
           </div>
         ) : isLoading ? (
-          <div className="py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+          <div className="py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
                 <tr>
-                  <th className="text-left  px-4 py-3 font-medium">시각 (JST)</th>
-                  <th className="text-left  px-4 py-3 font-medium">유저</th>
-                  <th className="text-left  px-4 py-3 font-medium">타입</th>
-                  <th className="text-left  px-4 py-3 font-medium">포맷</th>
-                  <th className="text-left  px-4 py-3 font-medium">화면</th>
-                  <th className="text-left  px-4 py-3 font-medium">네트워크</th>
-                  <th className="text-right px-4 py-3 font-medium">수익</th>
-                  <th className="text-left  px-4 py-3 font-medium">에러</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('ads.realtime.col.time')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('ads.realtime.col.user')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('ads.realtime.col.type')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('ads.realtime.col.format')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('ads.realtime.col.screen')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('ads.realtime.col.network')}</th>
+                  <th className="text-right px-4 py-3 font-medium">{t('ads.realtime.col.revenue')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('ads.realtime.col.error')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {(data ?? []).map((r, i) => {
-                  const e = EVENT_LABELS[r.event_type] ?? {
-                    ja: r.event_type,
+                  const e = EVENT_STYLES[r.event_type] ?? {
                     cls: 'bg-gray-100 text-gray-700',
                   }
+                  const eventLabel = EVENT_LABEL_KEYS[r.event_type] ?? r.event_type
                   const isError =
                     r.event_type === 'load_failed' ||
                     r.event_type === 'display_failed' ||
@@ -141,7 +155,7 @@ export default function AdRealtimeTable({ refreshKey: parentRefreshKey }) {
                         )}
                       </td>
                       <td className="px-4 py-2">
-                        <span className={`text-[11px] px-1.5 py-0.5 rounded ${e.cls}`}>{e.ja}</span>
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded ${e.cls}`}>{eventLabel}</span>
                       </td>
                       <td className="px-4 py-2 text-xs text-gray-700">
                         <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
@@ -174,7 +188,7 @@ export default function AdRealtimeTable({ refreshKey: parentRefreshKey }) {
                 {(!data || data.length === 0) && (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-gray-400 text-xs">
-                      이벤트가 없습니다
+                      {t('ads.realtime.noEvents')}
                     </td>
                   </tr>
                 )}

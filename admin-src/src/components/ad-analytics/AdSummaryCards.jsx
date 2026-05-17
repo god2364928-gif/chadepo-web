@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { supabase } from '../../lib/supabase'
 import { formatInt, formatUsd, formatPct } from '../../utils/jstFormat'
 
 export default function AdSummaryCards({ period, refreshKey }) {
+  const { t } = useLanguage()
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['ad_summary', period, refreshKey],
     queryFn: async () => {
@@ -20,13 +22,13 @@ export default function AdSummaryCards({ period, refreshKey }) {
     return (
       <div className="card border-red-200 bg-red-50">
         <p className="text-sm text-red-700 mb-2">
-          요약 정보를 불러오지 못했습니다: {error.message}
+          {t('ads.summary.loadError')}: {error.message}
         </p>
         <button
           onClick={() => refetch()}
           className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-100"
         >
-          다시 시도
+          {t('common.retry')}
         </button>
       </div>
     )
@@ -54,13 +56,13 @@ export default function AdSummaryCards({ period, refreshKey }) {
   }
 
   const cards = [
-    { label: '노출', value: formatInt(data?.total_impressions), color: 'text-gray-900' },
-    { label: '클릭', value: formatInt(data?.total_clicks), color: 'text-gray-900' },
-    { label: '수익', value: formatUsd(data?.total_revenue_usd), color: 'text-blue-600' },
-    { label: '리워드', value: formatInt(data?.total_rewarded), color: 'text-purple-600' },
-    { label: '로드 실패', value: formatInt(data?.total_load_failed), color: 'text-gray-700' },
+    { label: t('ads.summary.impressions'), value: formatInt(data?.total_impressions), color: 'text-gray-900' },
+    { label: t('ads.summary.clicks'), value: formatInt(data?.total_clicks), color: 'text-gray-900' },
+    { label: t('ads.summary.revenue'), value: formatUsd(data?.total_revenue_usd), color: 'text-blue-600' },
+    { label: t('ads.summary.rewarded'), value: formatInt(data?.total_rewarded), color: 'text-purple-600' },
+    { label: t('ads.summary.loadFailed'), value: formatInt(data?.total_load_failed), color: 'text-gray-700' },
     {
-      label: '실패율',
+      label: t('ads.summary.failureRate'),
       value: formatPct(data?.load_failure_rate),
       color: failureRateColor(data?.load_failure_rate),
     },

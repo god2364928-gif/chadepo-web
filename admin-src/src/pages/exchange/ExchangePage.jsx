@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstDateTime } from '../../utils/jstFormat'
 
 function ItemModal({ item, onClose }) {
   const qc = useQueryClient()
+  const { t } = useLanguage()
   const [form, setForm] = useState({
     title_ja: item?.title_ja ?? '',
     point_cost: item?.point_cost ?? '',
@@ -43,54 +46,54 @@ function ItemModal({ item, onClose }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
         <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900">{item ? '상품 수정' : '상품 추가'}</h3>
+          <h3 className="font-semibold text-gray-900">{item ? t('exchange.item.editTitle') : t('exchange.item.addTitle')}</h3>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {[
             {
-              label: '상품명 (일본어)',
+              label: t('exchange.item.field.titleJa'),
               key: 'title_ja',
               type: 'text',
               placeholder: 'Amazonギフトカード 500円',
               required: true,
             },
             {
-              label: '방식 (method)',
+              label: t('exchange.item.field.method'),
               key: 'method',
               type: 'text',
               placeholder: 'amazon_gift',
               required: true,
             },
             {
-              label: '액면가 (円)',
+              label: t('exchange.item.field.faceValue'),
               key: 'face_value',
               type: 'number',
               placeholder: '500',
               required: false,
             },
             {
-              label: '필요 포인트',
+              label: t('exchange.item.field.pointCost'),
               key: 'point_cost',
               type: 'number',
               placeholder: '5000',
               required: true,
             },
             {
-              label: '최소 보유 P',
+              label: t('exchange.item.field.minPoints'),
               key: 'min_points',
               type: 'number',
               placeholder: '5000',
               required: true,
             },
             {
-              label: '일일 한도',
+              label: t('exchange.item.field.dailyLimit'),
               key: 'daily_limit',
               type: 'number',
-              placeholder: '비워두면 무제한',
+              placeholder: t('exchange.item.field.dailyLimitPlaceholder'),
               required: false,
             },
             {
-              label: '정렬 순서',
+              label: t('exchange.item.field.sortOrder'),
               key: 'sort_order',
               type: 'number',
               placeholder: '0',
@@ -117,15 +120,15 @@ function ItemModal({ item, onClose }) {
               onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
             />
             <label htmlFor="is_active" className="text-sm text-gray-700">
-              노출 활성화
+              {t('exchange.item.activeLabel')}
             </label>
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={onClose} className="btn-secondary">
-              취소
+              {t('common.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? '저장 중...' : '저장'}
+              {loading ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </form>
@@ -138,6 +141,7 @@ const PAGE = 50
 
 export default function ExchangePage() {
   const qc = useQueryClient()
+  const { t } = useLanguage()
   const [tab, setTab] = useState('requests')
   const [editItem, setEditItem] = useState(undefined)
   const [filter, setFilter] = useState('pending')
@@ -197,12 +201,12 @@ export default function ExchangePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">교환 관리</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{t('exchange.title')}</h1>
 
       <div className="flex gap-2 border-b border-gray-200">
         {[
-          ['requests', '교환 신청'],
-          ['items', '상품 목록'],
+          ['requests', t('exchange.tab.requests')],
+          ['items', t('exchange.tab.items')],
         ].map(([k, l]) => (
           <button
             key={k}
@@ -222,9 +226,9 @@ export default function ExchangePage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             {[
-              ['pending', '대기 중'],
-              ['completed', '처리완료'],
-              ['all', '전체'],
+              ['pending', t('exchange.filter.pending')],
+              ['completed', t('exchange.filter.completed')],
+              ['all', t('exchange.filter.all')],
             ].map(([v, l]) => (
               <button
                 key={v}
@@ -240,7 +244,7 @@ export default function ExchangePage() {
             ))}
             {requests?.total > 0 && (
               <span className="ml-auto text-xs text-gray-400">
-                전체 {requests.total.toLocaleString()}건
+                {t('exchange.totalLabel')} {requests.total.toLocaleString()}{t('exchange.countSuffix')}
               </span>
             )}
           </div>
@@ -248,19 +252,19 @@ export default function ExchangePage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">신청일</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">유저</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">상품</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">소비 P</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">처리</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('exchange.col.requestedAt')}</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('exchange.col.user')}</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('exchange.col.item')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.pointsSpent')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.status')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.action')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {(requests?.rows ?? []).map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
-                      {new Date(r.created_at).toLocaleString('ko-KR')}
+                      {formatJstDateTime(r.created_at)}
                     </td>
                     <td className="px-4 py-3">
                       <Link to={`/admin/users/${r.user_id}`} className="text-brand hover:underline">
@@ -289,13 +293,13 @@ export default function ExchangePage() {
                         }
                       >
                         {r.status === 'pending'
-                          ? '대기중'
+                          ? t('exchange.status.pending')
                           : r.status === 'processing'
-                            ? '처리중'
+                            ? t('exchange.status.processing')
                             : r.status === 'completed'
-                              ? '완료'
+                              ? t('exchange.status.completed')
                               : r.status === 'failed'
-                                ? '실패'
+                                ? t('exchange.status.failed')
                                 : r.status}
                       </span>
                     </td>
@@ -305,7 +309,7 @@ export default function ExchangePage() {
                           onClick={() => deliver.mutate(r.id)}
                           className="text-xs text-brand hover:underline"
                         >
-                          완료 처리
+                          {t('exchange.action.complete')}
                         </button>
                       )}
                     </td>
@@ -314,7 +318,7 @@ export default function ExchangePage() {
                 {(requests?.rows ?? []).length === 0 && !reqLoading && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                      신청 내역이 없습니다
+                      {t('exchange.empty.requests')}
                     </td>
                   </tr>
                 )}
@@ -328,17 +332,17 @@ export default function ExchangePage() {
                 disabled={page === 0}
                 className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
               >
-                ← 이전
+                {t('common.prev')}
               </button>
               <span>
-                {page + 1} / {Math.ceil(requests.total / PAGE)} 페이지
+                {page + 1} / {Math.ceil(requests.total / PAGE)} {t('common.pageSuffix')}
               </span>
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={(page + 1) * PAGE >= requests.total}
                 className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
               >
-                다음 →
+                {t('common.next')}
               </button>
             </div>
           )}
@@ -352,21 +356,21 @@ export default function ExchangePage() {
           )}
           <div className="flex justify-end">
             <button onClick={() => setEditItem(null)} className="btn-primary text-sm">
-              + 상품 추가
+              {t('exchange.item.addButton')}
             </button>
           </div>
           <div className="card p-0 overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">상품명</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">방식</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">필요 P</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">최소 P</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">일일 한도</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">순서</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">노출</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">수정</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('exchange.col.itemName')}</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('exchange.col.method')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.requiredP')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.minP')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.dailyLimit')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.order')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.visible')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('exchange.col.edit')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -380,7 +384,7 @@ export default function ExchangePage() {
                     <td className="px-4 py-3 text-right">{it.point_cost?.toLocaleString()} P</td>
                     <td className="px-4 py-3 text-right">{it.min_points?.toLocaleString()} P</td>
                     <td className="px-4 py-3 text-right text-gray-500">
-                      {it.daily_limit ?? '무제한'}
+                      {it.daily_limit ?? t('exchange.unlimited')}
                     </td>
                     <td className="px-4 py-3 text-right">{it.sort_order}</td>
                     <td className="px-4 py-3 text-right">
@@ -398,7 +402,7 @@ export default function ExchangePage() {
                         onClick={() => setEditItem(it)}
                         className="text-xs text-brand hover:underline"
                       >
-                        수정
+                        {t('common.edit')}
                       </button>
                     </td>
                   </tr>

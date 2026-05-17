@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { Link } from 'react-router-dom'
+import { useLanguage } from '../contexts/LanguageContext'
+import { formatJstDate } from '../utils/jstFormat'
 
 function StatCard({ label, value, sub, color = 'gray', to }) {
   const colors = {
@@ -20,8 +22,28 @@ function StatCard({ label, value, sub, color = 'gray', to }) {
   return to ? <Link to={to}>{card}</Link> : card
 }
 
+function RecentUserBadge({ user, t }) {
+  // 대시보드는 단일 배지로 단순화 (UserList 는 banned/flagged/deleted 를 동시에 복수 배지로 표시).
+  // 우선순위: banned > deleted_at > flagged > normal — "위험 신호" 가 강한 순.
+  if (user.is_banned) {
+    return <span className="badge-red">{t('dashboard.status.banned')}</span>
+  }
+  if (user.deleted_at) {
+    return <span className="badge-red">{t('dashboard.status.deleted')}</span>
+  }
+  if (user.is_flagged) {
+    return <span className="badge-red">{t('dashboard.status.flagged')}</span>
+  }
+  return <span className="badge-green">{t('dashboard.status.normal')}</span>
+}
+
 export default function Dashboard() {
-  const { data: stats, isLoading } = useQuery({
+  const { lang, t } = useLanguage()
+  const {
+    data: stats,
+    isLoading,
+    error: statsError,
+  } = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('admin_get_dashboard_stats')
@@ -30,22 +52,25 @@ export default function Dashboard() {
     },
   })
 
-  const { data: recentUsers } = useQuery({
+  const { data: recentUsers, error: recentUsersError } = useQuery({
     queryKey: ['recent-users'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('id, nickname, created_at, points, energy, is_flagged')
+        .select(
+          'id, nickname, created_at, points, energy, is_flagged, is_banned, deleted_at, scheduled_deletion_at'
+        )
         .order('created_at', { ascending: false })
         .limit(8)
+      if (error) throw error
       return data ?? []
     },
   })
 
-  const { data: pendingExchanges } = useQuery({
+  const { data: pendingExchanges, error: pendingExchangesError } = useQuery({
     queryKey: ['pending-exchanges'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('exchange_requests')
         .select(
           'id, points_spent, status, created_at, user_id, profiles!user_id(nickname), exchange_items!item_id(title_ja)'
@@ -53,91 +78,146 @@ export default function Dashboard() {
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(5)
+      if (error) throw error
       return data ?? []
     },
   })
 
-  if (isLoading) return <div className="text-gray-400 text-sm">読み込み中...</div>
+  if (isLoading) return <div className="text-gray-400 text-sm">{t('common.loading')}</div>
 
-  const today = new Date().toLocaleDateString('ko-KR', {
+  // ヘッダ「今日:」は曜日付きで運用 OS ではなく JST 暦の今日を表示.
+  const localeTag = lang === 'ko' ? 'ko-KR' : 'ja-JP'
+  const today = new Date().toLocaleDateString(localeTag, {
+    timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     weekday: 'short',
   })
 
+  const loadError = statsError || recentUsersError || pendingExchangesError
+
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('dashboard.title')}</h1>
         <p className="text-gray-500 text-sm mt-1">{today}</p>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {t('dashboard.error.loadFailed')}
+          {loadError?.message ? <span className="ml-2 text-red-500">({loadError.message})</span> : null}
+        </div>
+      )}
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="전체 가입자"
+          label={t('dashboard.stat.totalUsers')}
           value={stats?.total_users?.toLocaleString()}
           color="gray"
           to="/admin/users"
         />
         <StatCard
-          label="오늘 신규 가입"
+          label={t('dashboard.stat.todaySignups')}
           value={stats?.today_signups}
           color="blue"
           to="/admin/users"
         />
         <StatCard
-          label="교환 대기 중"
+          label={t('dashboard.stat.pendingExchanges')}
           value={stats?.pending_exchanges}
           color={stats?.pending_exchanges > 0 ? 'orange' : 'gray'}
           to="/admin/exchange"
-          sub="처리 필요"
+          sub={t('dashboard.stat.pendingExchanges.sub')}
         />
         <StatCard
-          label="의심 유저"
+          label={t('dashboard.stat.flaggedUsers')}
           value={stats?.flagged_users}
           color={stats?.flagged_users > 0 ? 'red' : 'gray'}
           to="/admin/fraud"
-          sub="확인 필요"
+          sub={t('dashboard.stat.flaggedUsers.sub')}
         />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
-          label="오늘 포인트 발행"
+          label={t('dashboard.stat.todayPoints')}
           value={`${(stats?.today_points_issued ?? 0).toLocaleString()} P`}
           color="green"
         />
         <StatCard
-          label="오늘 에너지 발행"
+          label={t('dashboard.stat.todayEnergy')}
           value={`${(stats?.today_energy_issued ?? 0).toLocaleString()} E`}
           color="green"
         />
         <StatCard
-          label="진행 중 응모 라운드"
+          label={t('dashboard.stat.activeRaffles')}
           value={stats?.active_raffle_rounds}
           color="blue"
           to="/admin/raffle"
         />
       </div>
 
+      {/* 운영 큐 (처리 필요) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label={t('dashboard.stat.inquiriesPending')}
+          value={stats?.inquiries_pending}
+          color={stats?.inquiries_pending > 0 ? 'orange' : 'gray'}
+          to="/admin/inquiry"
+          sub={t('dashboard.stat.opsQueue.sub')}
+        />
+        <StatCard
+          label={t('dashboard.stat.referralFlagged')}
+          value={stats?.referral_flagged}
+          color={stats?.referral_flagged > 0 ? 'red' : 'gray'}
+          to="/admin/referral"
+          sub={t('dashboard.stat.opsQueue.sub')}
+        />
+        <StatCard
+          label={t('dashboard.stat.campaignsFailed')}
+          value={stats?.campaigns_failed}
+          color={stats?.campaigns_failed > 0 ? 'red' : 'gray'}
+          to="/admin/campaigns"
+          sub={t('dashboard.stat.opsQueue.sub')}
+        />
+        <StatCard
+          label={t('dashboard.stat.deletionRequested')}
+          value={stats?.deletion_requested_users}
+          color={stats?.deletion_requested_users > 0 ? 'orange' : 'gray'}
+          to="/admin/users"
+          sub={t('dashboard.stat.opsQueue.sub')}
+        />
+      </div>
+
       {/* 최근 가입자 */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">최근 가입자</h2>
+          <h2 className="font-semibold text-gray-900">{t('dashboard.recent.title')}</h2>
           <Link to="/admin/users" className="text-brand text-sm hover:underline">
-            전체 보기 →
+            {t('common.viewAll')}
           </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="text-left py-2 text-gray-500 font-medium">닉네임</th>
-                <th className="text-right py-2 text-gray-500 font-medium">포인트</th>
-                <th className="text-right py-2 text-gray-500 font-medium">에너지</th>
-                <th className="text-right py-2 text-gray-500 font-medium">가입일</th>
-                <th className="text-right py-2 text-gray-500 font-medium">상태</th>
+                <th className="text-left py-2 text-gray-500 font-medium">
+                  {t('dashboard.recent.col.nickname')}
+                </th>
+                <th className="text-right py-2 text-gray-500 font-medium">
+                  {t('dashboard.recent.col.points')}
+                </th>
+                <th className="text-right py-2 text-gray-500 font-medium">
+                  {t('dashboard.recent.col.energy')}
+                </th>
+                <th className="text-right py-2 text-gray-500 font-medium">
+                  {t('dashboard.recent.col.joinedAt')}
+                </th>
+                <th className="text-right py-2 text-gray-500 font-medium">
+                  {t('dashboard.recent.col.status')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -158,14 +238,10 @@ export default function Dashboard() {
                     {u.energy?.toLocaleString()} E
                   </td>
                   <td className="py-2.5 text-right text-gray-400">
-                    {new Date(u.created_at).toLocaleDateString('ko-KR')}
+                    {formatJstDate(u.created_at)}
                   </td>
                   <td className="py-2.5 text-right">
-                    {u.is_flagged ? (
-                      <span className="badge-red">의심</span>
-                    ) : (
-                      <span className="badge-green">정상</span>
-                    )}
+                    <RecentUserBadge user={u} t={t} />
                   </td>
                 </tr>
               ))}
@@ -178,9 +254,11 @@ export default function Dashboard() {
       {pendingExchanges && pendingExchanges.length > 0 && (
         <div className="card border-l-4 border-brand">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900">⚠️ 처리 대기 교환 신청</h2>
+            <h2 className="font-semibold text-gray-900">
+              {t('dashboard.pendingExchange.title')}
+            </h2>
             <Link to="/admin/exchange" className="text-brand text-sm hover:underline">
-              모두 처리 →
+              {t('common.processAll')}
             </Link>
           </div>
           <div className="space-y-2">
@@ -199,7 +277,7 @@ export default function Dashboard() {
                   <span className="text-sm font-medium text-gray-700">
                     {ex.points_spent?.toLocaleString()} P
                   </span>
-                  <span className="badge-yellow">대기</span>
+                  <span className="badge-yellow">{t('dashboard.pendingExchange.badge')}</span>
                 </div>
               </div>
             ))}

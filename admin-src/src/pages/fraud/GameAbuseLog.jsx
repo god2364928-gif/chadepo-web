@@ -3,26 +3,25 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { GAME_TYPE_LABELS } from '../../lib/gameLabels'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstMonthDayTime } from '../../utils/jstFormat'
 
 const LIMITS = [50, 100, 200, 500]
 
+// 不正ログは JST 固定 (運用 OS の TZ に依存させない).
 function fmtDateTime(ts) {
-  if (!ts) return '—'
-  return new Date(ts).toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return ts ? formatJstMonthDayTime(ts) : '—'
 }
 
-function fmtMs(ms) {
+function fmtMs(ms, secLabel) {
   if (ms == null) return '—'
   if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(2)}초`
+  return `${(ms / 1000).toFixed(2)}${secLabel}`
 }
 
 export default function GameAbuseLog() {
+  const { t } = useLanguage()
+  const secLabel = t('common.secondsShort')
   const [gameFilter, setGameFilter] = useState('')
   const [limit, setLimit] = useState(100)
 
@@ -45,7 +44,7 @@ export default function GameAbuseLog() {
 
   if (error) {
     return (
-      <div className="card text-red-600 text-sm">어뷰징 로그 불러오기 실패: {error.message}</div>
+      <div className="card text-red-600 text-sm">{t('fraud.gameAbuse.fetchFail')}: {error.message}</div>
     )
   }
 
@@ -57,13 +56,13 @@ export default function GameAbuseLog() {
       {/* 필터 */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">게임 종류</span>
+          <span className="text-xs text-gray-500">{t('fraud.gameAbuse.gameType')}</span>
           <select
             value={gameFilter}
             onChange={(e) => setGameFilter(e.target.value)}
             className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
           >
-            <option value="">전체</option>
+            <option value="">{t('common.all')}</option>
             {distinctGames.map((g) => (
               <option key={g} value={g}>
                 {GAME_TYPE_LABELS[g] ?? g}
@@ -72,7 +71,7 @@ export default function GameAbuseLog() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">표시 건수</span>
+          <span className="text-xs text-gray-500">{t('common.displayCount')}</span>
           <select
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
@@ -80,7 +79,7 @@ export default function GameAbuseLog() {
           >
             {LIMITS.map((n) => (
               <option key={n} value={n}>
-                {n}건
+                {n}{t('common.casesUnit')}
               </option>
             ))}
           </select>
@@ -88,33 +87,33 @@ export default function GameAbuseLog() {
       </div>
 
       {isLoading ? (
-        <div className="card py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+        <div className="card py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
       ) : (logs ?? []).length === 0 ? (
-        <div className="card py-12 text-center text-gray-400 text-sm">어뷰징 의심 사례 없음 ✅</div>
+        <div className="card py-12 text-center text-gray-400 text-sm">{t('fraud.gameAbuse.empty')} ✅</div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900 text-sm">
-              어뷰징 의심 로그
+              {t('fraud.gameAbuse.suspiciousLog')}
               <span className="ml-2 text-xs text-gray-400 font-normal">
-                총 {logs.length.toLocaleString()}건
+                {t('common.totalPrefix')} {logs.length.toLocaleString()}{t('common.casesUnit')}
               </span>
             </h2>
             <span className="text-[10px] text-gray-400">
-              ※ 거절 없이 기록만 함. 누적 위반 많은 유저 우선 검토
+              ※ {t('fraud.gameAbuse.recordOnlyNote')}
             </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
                 <tr>
-                  <th className="text-left  px-4 py-3 font-medium">시각</th>
-                  <th className="text-left  px-4 py-3 font-medium">유저</th>
-                  <th className="text-left  px-4 py-3 font-medium">게임</th>
-                  <th className="text-right px-4 py-3 font-medium">기록 시간</th>
-                  <th className="text-right px-4 py-3 font-medium">최소 허용</th>
-                  <th className="text-right px-4 py-3 font-medium">누적 위반</th>
-                  <th className="text-left  px-4 py-3 font-medium">앱 버전</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('fraud.gameAbuse.col.time')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('fraud.gameAbuse.col.user')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('fraud.gameAbuse.col.game')}</th>
+                  <th className="text-right px-4 py-3 font-medium">{t('fraud.gameAbuse.col.recordedTime')}</th>
+                  <th className="text-right px-4 py-3 font-medium">{t('fraud.gameAbuse.col.minAllowed')}</th>
+                  <th className="text-right px-4 py-3 font-medium">{t('fraud.gameAbuse.col.totalViolations')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('fraud.gameAbuse.col.appVersion')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -143,10 +142,10 @@ export default function GameAbuseLog() {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs text-orange-500 font-medium">
-                        {fmtMs(r.recorded_value)}
+                        {fmtMs(r.recorded_value, secLabel)}
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs text-gray-400">
-                        {fmtMs(r.expected_minimum)}
+                        {fmtMs(r.expected_minimum, secLabel)}
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs">
                         <span
@@ -158,11 +157,11 @@ export default function GameAbuseLog() {
                                 : 'text-gray-400'
                           }
                         >
-                          {Number(r.user_total_violations)}회
+                          {Number(r.user_total_violations)}{t('common.timesUnit')}
                         </span>
                         {isMultiGame && (
                           <span className="ml-1 text-[10px] text-red-500 bg-red-100 px-1 rounded">
-                            {r.user_distinct_games}게임
+                            {r.user_distinct_games}{t('fraud.gameAbuse.gamesUnit')}
                           </span>
                         )}
                       </td>
@@ -176,8 +175,8 @@ export default function GameAbuseLog() {
             </table>
           </div>
           <div className="px-4 py-2 border-t border-gray-100 text-[10px] text-gray-400 flex gap-4">
-            <span>● 누적 위반 3회 이상 행은 분홍색 배경</span>
-            <span>● 「2게임 이상」 배지는 다양한 게임에서 반복 위반한 유저</span>
+            <span>● {t('fraud.gameAbuse.footnotePink')}</span>
+            <span>● {t('fraud.gameAbuse.footnoteMultiGame')}</span>
           </div>
         </div>
       )}

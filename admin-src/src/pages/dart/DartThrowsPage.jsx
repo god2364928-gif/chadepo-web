@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstMonthDayTime } from '../../utils/jstFormat'
 
 const LIMITS = [50, 100, 200]
 
@@ -25,17 +27,13 @@ const AREA_COLORS = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// 投擲ログは月-日 時:分 を JST 固定で表示.
 function fmtDateTime(ts) {
-  if (!ts) return '—'
-  return new Date(ts).toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return ts ? formatJstMonthDayTime(ts) : '—'
 }
 
 export default function DartThrowsPage() {
+  const { t } = useLanguage()
   const [userInput, setUserInput] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -73,7 +71,7 @@ export default function DartThrowsPage() {
   if (error) {
     return (
       <div className="card text-red-600 text-sm">
-        ダーツ ログ 불러오기 실패: {error.message}
+        {t('dart.fetchFail')}: {error.message}
       </div>
     )
   }
@@ -83,9 +81,9 @@ export default function DartThrowsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">🎯 ダーツチャレンジ</h1>
+        <h1 className="text-2xl font-bold text-gray-900">🎯 {t('dart.title')}</h1>
         <p className="text-xs text-gray-500 mt-1">
-          1日2回 (ミッション 2개 후 1차 / 6개 후 2차) 챌린지의 throw 로그
+          {t('dart.subtitle')}
         </p>
       </div>
 
@@ -93,17 +91,17 @@ export default function DartThrowsPage() {
       <div className="card space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">유저 (nickname 또는 UUID)</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('dart.filter.user')}</label>
             <input
               type="text"
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
-              placeholder="부분일치 검색"
+              placeholder={t('dart.filter.userPlaceholder')}
               className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
             />
             {trimmedUser && (
               <div className="text-[10px] text-gray-400 mt-1">
-                {isUuid ? 'UUID 정확 일치' : 'nickname 부분일치'}
+                {isUuid ? t('dart.filter.uuidMatch') : t('dart.filter.nicknamePartial')}
               </div>
             )}
           </div>
@@ -134,9 +132,9 @@ export default function DartThrowsPage() {
               onChange={(e) => setTier(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
             >
-              <option value="">전체</option>
-              <option value="1">1차 (ミッション 2개 후)</option>
-              <option value="2">2차 (ミッション 6개 후)</option>
+              <option value="">{t('common.all')}</option>
+              <option value="1">{t('dart.tier.first')}</option>
+              <option value="2">{t('dart.tier.second')}</option>
             </select>
           </div>
           <div className="flex items-end gap-3">
@@ -147,10 +145,10 @@ export default function DartThrowsPage() {
                 onChange={(e) => setJackpotOnly(e.target.checked)}
                 className="rounded"
               />
-              잭팟만
+              {t('dart.filter.jackpotOnly')}
             </label>
             <div className="flex-1">
-              <label className="block text-xs text-gray-500 mb-1">표시 건수</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('common.displayCount')}</label>
               <select
                 value={limit}
                 onChange={(e) => setLimit(Number(e.target.value))}
@@ -158,7 +156,7 @@ export default function DartThrowsPage() {
               >
                 {LIMITS.map((n) => (
                   <option key={n} value={n}>
-                    {n}건
+                    {n}{t('common.casesUnit')}
                   </option>
                 ))}
               </select>
@@ -169,39 +167,39 @@ export default function DartThrowsPage() {
 
       {/* 결과 */}
       {isLoading ? (
-        <div className="card py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+        <div className="card py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
       ) : (rows ?? []).length === 0 ? (
-        <div className="card py-12 text-center text-gray-400 text-sm">조건에 해당하는 throw 가 없습니다</div>
+        <div className="card py-12 text-center text-gray-400 text-sm">{t('dart.noMatches')}</div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900 text-sm">
-              throw 로그
+              {t('dart.logTitle')}
               <span className="ml-2 text-xs text-gray-400 font-normal">
-                총 {rows.length.toLocaleString()}건
+                {t('common.totalPrefix')} {rows.length.toLocaleString()}{t('common.casesUnit')}
                 {jackpotCount > 0 && (
                   <span className="ml-2 text-orange-500">
-                    (잭팟 {jackpotCount}건)
+                    ({t('dart.jackpot')} {jackpotCount}{t('common.casesUnit')})
                   </span>
                 )}
               </span>
             </h2>
             <span className="text-[10px] text-gray-400">
-              ※ 최신순. 결과 200건 상한 (페이지네이션 미구현)
+              ※ {t('dart.logNote')}
             </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
                 <tr>
-                  <th className="text-left  px-4 py-3 font-medium">시각</th>
-                  <th className="text-left  px-4 py-3 font-medium">throw 날짜</th>
-                  <th className="text-left  px-4 py-3 font-medium">유저</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('dart.col.time')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('dart.col.throwDate')}</th>
+                  <th className="text-left  px-4 py-3 font-medium">{t('dart.col.user')}</th>
                   <th className="text-center px-4 py-3 font-medium">tier</th>
                   <th className="text-left  px-4 py-3 font-medium">area</th>
-                  <th className="text-right px-4 py-3 font-medium">획득 P</th>
-                  <th className="text-center px-4 py-3 font-medium">잭팟</th>
-                  <th className="text-right px-4 py-3 font-medium">리롤</th>
+                  <th className="text-right px-4 py-3 font-medium">{t('dart.col.earnedPoints')}</th>
+                  <th className="text-center px-4 py-3 font-medium">{t('dart.jackpot')}</th>
+                  <th className="text-right px-4 py-3 font-medium">{t('dart.col.reroll')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -221,7 +219,7 @@ export default function DartThrowsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-2.5 text-center text-xs text-gray-700">
-                      {r.challenge_tier === 1 ? '1차' : '2차'}
+                      {r.challenge_tier === 1 ? t('dart.tierShort.first') : t('dart.tierShort.second')}
                     </td>
                     <td className={`px-4 py-2.5 text-xs ${AREA_COLORS[r.area] ?? 'text-gray-700'}`}>
                       {AREA_LABELS[r.area] ?? r.area}
@@ -242,7 +240,7 @@ export default function DartThrowsPage() {
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-right text-xs text-gray-500">
-                      {r.reroll_count > 0 ? `${r.reroll_count}회` : '—'}
+                      {r.reroll_count > 0 ? `${r.reroll_count}${t('common.timesUnit')}` : '—'}
                     </td>
                   </tr>
                 ))}
@@ -250,8 +248,8 @@ export default function DartThrowsPage() {
             </table>
           </div>
           <div className="px-4 py-2 border-t border-gray-100 text-[10px] text-gray-400 flex gap-4">
-            <span>● 잭팟 행은 주황색 배경</span>
-            <span>● area: outer / middle / inner / triple / bullseye / MEGA(=mega_jackpot)</span>
+            <span>● {t('dart.footnoteJackpot')}</span>
+            <span>● {t('dart.footnoteArea')}</span>
           </div>
         </div>
       )}

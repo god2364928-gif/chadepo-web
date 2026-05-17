@@ -1,14 +1,17 @@
+import { useLanguage } from '../../contexts/LanguageContext'
+
 const PERIODS = [
-  { id: '1d', label: '오늘' },
-  { id: '7d', label: '7일' },
-  { id: '30d', label: '30일' },
-  { id: '90d', label: '90일' },
+  { id: '1d', labelKey: 'ads.period.today' },
+  { id: '7d', labelKey: 'ads.period.7d' },
+  { id: '30d', labelKey: 'ads.period.30d' },
+  { id: '90d', labelKey: 'ads.period.90d' },
 ]
 
 export default function PeriodSelector({ value, onChange, disabled = false }) {
+  const { t } = useLanguage()
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500">기간</span>
+      <span className="text-xs text-gray-500">{t('ads.period.label')}</span>
       {PERIODS.map((p) => (
         <button
           key={p.id}
@@ -20,7 +23,7 @@ export default function PeriodSelector({ value, onChange, disabled = false }) {
               : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
           }`}
         >
-          {p.label}
+          {t(p.labelKey)}
         </button>
       ))}
     </div>

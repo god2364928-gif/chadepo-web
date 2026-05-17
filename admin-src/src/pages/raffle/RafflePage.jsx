@@ -2,27 +2,30 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstDate } from '../../utils/jstFormat'
 
 // 100P (prize_value <= AUTO_DRAW_MAX_PRIZE) 만 자동 추첨, 그 외는 어드민 직접 지정
 // 모든 추첨 상품(100P 포함)은 어드민 「당첨 지정」 후 사용자가 앱에서 「受け取る」 버튼을
 // 직접 눌러야 포인트가 지급됨 (Phase 1A 셀프 클레임 플로우)
 const AUTO_DRAW_MAX_PRIZE = 100
 
-const statusBadge = (s) => {
-  if (s === 'active') return <span className="badge-green">진행중</span>
-  if (s === 'drawing') return <span className="badge-blue">추첨중</span>
-  if (s === 'completed') return <span className="badge-gray">완료</span>
-  if (s === 'cancelled') return <span className="badge-red">취소</span>
-  return <span className="badge-gray">{s}</span>
-}
-
 const ENTRY_PAGE = 100
 
 export default function RafflePage() {
   const qc = useQueryClient()
+  const { t } = useLanguage()
   const [selectedItemId, setSelectedItemId] = useState(null)
   const [selectedRound, setSelectedRound] = useState(null)
   const [entryPage, setEntryPage] = useState(0)
+
+  const statusBadge = (s) => {
+    if (s === 'active') return <span className="badge-green">{t('raffle.status.active')}</span>
+    if (s === 'drawing') return <span className="badge-blue">{t('raffle.status.drawing')}</span>
+    if (s === 'completed') return <span className="badge-gray">{t('raffle.status.completed')}</span>
+    if (s === 'cancelled') return <span className="badge-red">{t('raffle.status.cancelled')}</span>
+    return <span className="badge-gray">{s}</span>
+  }
 
   // 상품 목록 (탭용)
   const { data: items } = useQuery({
@@ -171,11 +174,10 @@ export default function RafflePage() {
 
   const handleStartDrawing = () => {
     const ok = window.confirm(
-      `⚠️ 추첨 단계로 전환합니다.\n\n` +
-        `회차: #${selectedRound.round_no}\n` +
-        `현재 응모자: ${entriesTotal.toLocaleString()}명 / 티켓 ${(selectedRound.current_entries ?? 0).toLocaleString()}장\n\n` +
-        `이 시점부터 더 이상 응모를 받지 않습니다.\n` +
-        `진행하시겠습니까?`
+      t('raffle.confirm.startDrawing')
+        .replace('{round}', selectedRound.round_no)
+        .replace('{users}', entriesTotal.toLocaleString())
+        .replace('{tickets}', (selectedRound.current_entries ?? 0).toLocaleString())
     )
     if (!ok) return
     setPickError('')
@@ -205,14 +207,12 @@ export default function RafflePage() {
   })
 
   const handlePickWinner = (userId, nickname) => {
-    const prizeLabel = selectedItem?.title_ja ?? '상품'
+    const prizeLabel = selectedItem?.title_ja ?? t('raffle.fallback.prize')
     const ok = window.confirm(
-      `⚠️ 당첨자로 지정합니다.\n\n` +
-        `당첨자: ${nickname}\n` +
-        `회차: #${selectedRound.round_no}\n` +
-        `상품: ${prizeLabel}\n\n` +
-        `※ 지정 후 사용자가 앱에서 「受け取る」 버튼을 직접 눌러야 포인트가 지급됩니다.\n` +
-        `한 번 지정하면 되돌릴 수 없습니다. 진행하시겠습니까?`
+      t('raffle.confirm.pickWinner')
+        .replace('{nickname}', nickname)
+        .replace('{round}', selectedRound.round_no)
+        .replace('{prize}', prizeLabel)
     )
     if (!ok) return
     setPickError('')
@@ -237,18 +237,18 @@ export default function RafflePage() {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">응모·추첨 관리</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('raffle.title')}</h1>
           <p className="text-gray-500 text-sm mt-1">
             {isManualItem
-              ? '응모 목표 도달 시 자동으로 「추첨중」으로 전환됩니다. 어드민이 당첨자를 지정한 후, 사용자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다.'
-              : '목표 응모 수 달성 시 자동 추첨됩니다. 사용자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다.'}
+              ? t('raffle.subtitle.manual')
+              : t('raffle.subtitle.auto')}
           </p>
         </div>
         <button
           onClick={() => refetchRounds()}
           className="shrink-0 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 whitespace-nowrap"
         >
-          🔄 새로고침
+          {t('raffle.refresh')}
         </button>
       </div>
 
@@ -265,7 +265,7 @@ export default function RafflePage() {
             }`}
           >
             {item.title_ja}
-            {!item.is_active && <span className="ml-1 text-xs text-gray-400">(비활성)</span>}
+            {!item.is_active && <span className="ml-1 text-xs text-gray-400">{t('raffle.inactiveSuffix')}</span>}
           </button>
         ))}
       </div>
@@ -276,15 +276,15 @@ export default function RafflePage() {
         <div className="lg:col-span-1 space-y-2">
           <div className="flex items-center justify-between px-1 mb-2">
             <h2 className="font-semibold text-gray-700 text-sm">
-              회차 목록
+              {t('raffle.roundList.title')}
               {rounds && (
-                <span className="ml-1 text-gray-400 font-normal">({rounds.length}건)</span>
+                <span className="ml-1 text-gray-400 font-normal">({rounds.length}{t('exchange.countSuffix')})</span>
               )}
             </h2>
             {selectedItem && (
               <span className="text-xs text-gray-400">
-                응모비 {selectedItem.entry_cost_energy}E · 최대 {selectedItem.max_entries_per_user}
-                회
+                {t('raffle.entryCost')} {selectedItem.entry_cost_energy}E · {t('raffle.maxLabel')} {selectedItem.max_entries_per_user}
+                {t('raffle.timesSuffix')}
               </span>
             )}
           </div>
@@ -305,12 +305,12 @@ export default function RafflePage() {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-semibold text-sm">회차 #{r.round_no}</span>
+                    <span className="font-semibold text-sm">{t('raffle.roundLabel')} #{r.round_no}</span>
                     {statusBadge(r.status)}
                   </div>
                   <div className="text-xs text-gray-500 mb-2">
-                    응모 {r.current_entries?.toLocaleString()} /{' '}
-                    {r.target_entries?.toLocaleString()}명
+                    {t('raffle.entryLabel')} {r.current_entries?.toLocaleString()} /{' '}
+                    {r.target_entries?.toLocaleString()}{t('raffle.peopleSuffix')}
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-1.5">
                     <div
@@ -325,10 +325,10 @@ export default function RafflePage() {
                     />
                   </div>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-xs text-gray-400">{progress}% 달성</span>
+                    <span className="text-xs text-gray-400">{progress}% {t('raffle.achieved')}</span>
                     {r.drawn_at && (
                       <span className="text-xs text-gray-400">
-                        {new Date(r.drawn_at).toLocaleDateString('ko-KR')}
+                        {formatJstDate(r.drawn_at)}
                       </span>
                     )}
                   </div>
@@ -337,7 +337,7 @@ export default function RafflePage() {
             })}
             {rounds?.length === 0 && (
               <div className="text-center text-gray-400 text-sm py-12 bg-gray-50 rounded-xl">
-                회차 없음
+                {t('raffle.empty.rounds')}
               </div>
             )}
           </div>
@@ -350,9 +350,9 @@ export default function RafflePage() {
               <div className="text-center text-gray-400">
                 <div className="text-4xl mb-3">←</div>
                 <p className="text-sm">
-                  회차를 선택하면
+                  {t('raffle.empty.selectRound1')}
                   <br />
-                  상세 정보가 여기에 표시됩니다
+                  {t('raffle.empty.selectRound2')}
                 </p>
               </div>
             </div>
@@ -362,7 +362,7 @@ export default function RafflePage() {
               <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-900">
-                    {selectedItem?.title_ja} — 회차 #{selectedRound.round_no}
+                    {selectedItem?.title_ja} — {t('raffle.roundLabel')} #{selectedRound.round_no}
                   </h3>
                   {statusBadge(selectedRound.status)}
                 </div>
@@ -371,45 +371,43 @@ export default function RafflePage() {
                     <div className="text-xl font-bold text-gray-900">
                       {uniqueUsers.toLocaleString()}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">응모 유저</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{t('raffle.summary.entryUsers')}</div>
                   </div>
                   <div className="bg-orange-50 rounded-lg p-3">
                     <div className="text-xl font-bold text-brand">
                       {totalTickets.toLocaleString()}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">총 티켓 수</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{t('raffle.summary.totalTickets')}</div>
                   </div>
                   <div className="bg-blue-50 rounded-lg p-3">
                     <div className="text-xl font-bold text-blue-700">
                       {selectedRound.winner_count ?? 1}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">당첨자 수</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{t('raffle.summary.winnerCount')}</div>
                   </div>
                 </div>
 
                 {/* 자동 추첨 안내 */}
                 {selectedRound.status === 'active' && !isManualItem && (
                   <div className="mt-3 p-3 bg-yellow-50 rounded-lg text-xs text-yellow-700">
-                    ℹ️ 목표 응모 수({selectedRound.target_entries?.toLocaleString()}명) 달성 시 자동
-                    추첨됩니다
+                    {t('raffle.notice.autoDraw').replace('{target}', selectedRound.target_entries?.toLocaleString() ?? '')}
                   </div>
                 )}
 
                 {/* 수동 추첨 상품: 응모 접수 중 (목표 미달) */}
                 {showTargetWaiting && (
                   <div className="mt-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <p className="text-sm font-semibold text-amber-800">⏳ 응모 접수중</p>
+                    <p className="text-sm font-semibold text-amber-800">{t('raffle.waiting.title')}</p>
                     <p className="text-xs text-amber-700 mt-1">
-                      현재 티켓 {totalTickets.toLocaleString()}장 / 목표{' '}
-                      {targetEntries.toLocaleString()}장 &nbsp;(
+                      {t('raffle.waiting.currentLabel')} {totalTickets.toLocaleString()}{t('raffle.waiting.ticketsUnit')} / {t('raffle.waiting.targetLabel')}{' '}
+                      {targetEntries.toLocaleString()}{t('raffle.waiting.ticketsUnit')} &nbsp;(
                       <span className="font-semibold">
-                        {(targetEntries - totalTickets).toLocaleString()}장 남음
+                        {(targetEntries - totalTickets).toLocaleString()}{t('raffle.waiting.remainingSuffix')}
                       </span>
                       )
                     </p>
                     <p className="text-[11px] text-amber-600 mt-1.5">
-                      목표 응모 수에 도달하면 자동으로 「추첨중」 단계로 넘어가고, 다음 회차가 즉시
-                      새로 열립니다.
+                      {t('raffle.waiting.description')}
                     </p>
                   </div>
                 )}
@@ -420,16 +418,15 @@ export default function RafflePage() {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-purple-800">
-                          🎯 목표 응모 수 달성
+                          {t('raffle.startDraw.title')}
                         </p>
                         <p className="text-xs text-purple-600 mt-0.5">
-                          현재 {uniqueUsers.toLocaleString()}명 · 티켓{' '}
-                          {totalTickets.toLocaleString()}장 (목표 {targetEntries.toLocaleString()}
-                          장)
+                          {t('raffle.startDraw.currentLabel')} {uniqueUsers.toLocaleString()}{t('raffle.peopleSuffix')} · {t('raffle.waiting.ticketsLabel')}{' '}
+                          {totalTickets.toLocaleString()}{t('raffle.waiting.ticketsUnit')} ({t('raffle.waiting.targetLabel')} {targetEntries.toLocaleString()}
+                          {t('raffle.waiting.ticketsUnit')})
                         </p>
                         <p className="text-[11px] text-purple-500 mt-1">
-                          통상은 자동 전환됩니다. 수동 시작 시 응모 접수가 종료되고 당첨자를 직접
-                          선택하는 단계로 넘어갑니다.
+                          {t('raffle.startDraw.description')}
                         </p>
                       </div>
                       <button
@@ -437,7 +434,7 @@ export default function RafflePage() {
                         disabled={startDrawing.isPending}
                         className="shrink-0 px-4 py-2 text-sm font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg whitespace-nowrap"
                       >
-                        🎲 추첨 시작
+                        {t('raffle.startDraw.button')}
                       </button>
                     </div>
                   </div>
@@ -447,14 +444,14 @@ export default function RafflePage() {
                 {canPickWinner && (
                   <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
                     <p className="text-sm font-semibold text-blue-800">
-                      👇 아래 응모자 목록에서 당첨자를 직접 선택하세요
+                      {t('raffle.pick.title')}
                     </p>
                     <p className="text-xs text-blue-600 mt-0.5">
-                      응모자 {uniqueUsers.toLocaleString()}명 · 티켓 {totalTickets.toLocaleString()}
-                      장 (응모는 마감되었습니다)
+                      {t('raffle.pick.entrantsLabel')} {uniqueUsers.toLocaleString()}{t('raffle.peopleSuffix')} · {t('raffle.waiting.ticketsLabel')} {totalTickets.toLocaleString()}
+                      {t('raffle.waiting.ticketsUnit')} {t('raffle.pick.closedSuffix')}
                     </p>
                     <p className="text-[11px] text-blue-500 mt-1">
-                      ※ 지정 후 사용자가 앱에서 「受け取る」 버튼을 직접 눌러야 포인트가 지급됩니다.
+                      {t('raffle.pick.note')}
                     </p>
                   </div>
                 )}
@@ -462,17 +459,16 @@ export default function RafflePage() {
                 {/* 추첨 완료 안내 (수동 추첨 상품) */}
                 {isManualItem && selectedRound.status === 'completed' && (
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-sm font-semibold text-gray-700">✅ 추첨 완료</p>
+                    <p className="text-sm font-semibold text-gray-700">{t('raffle.completed.title')}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      당첨자가 앱에서 「受け取る」 버튼을 누르면 포인트가 지급됩니다. 코멘트는
-                      부적절 시 「숨김 처리」 가능합니다.
+                      {t('raffle.completed.description')}
                     </p>
                   </div>
                 )}
 
                 {pickError && (
                   <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
-                    <p className="text-xs text-red-700">오류: {pickError}</p>
+                    <p className="text-xs text-red-700">{t('common.error')}: {pickError}</p>
                   </div>
                 )}
               </div>
@@ -481,7 +477,7 @@ export default function RafflePage() {
               {(winners ?? []).length > 0 && (
                 <div className="card">
                   <h3 className="font-semibold text-gray-900 mb-3">
-                    🏆 당첨자 ({winners.length}명)
+                    {t('raffle.winners.title')} ({winners.length}{t('raffle.peopleSuffix')})
                   </h3>
                   <div className="space-y-3">
                     {winners.map((w) => (
@@ -498,21 +494,21 @@ export default function RafflePage() {
                           </Link>
                           {w.claimed_at ? (
                             <span className="badge-green">
-                              수령 완료 ({new Date(w.claimed_at).toLocaleDateString('ko-KR')})
+                              {t('raffle.winners.claimed')} ({formatJstDate(w.claimed_at)})
                             </span>
                           ) : (
-                            <span className="badge-yellow">수령 대기</span>
+                            <span className="badge-yellow">{t('raffle.winners.pending')}</span>
                           )}
                         </div>
 
                         {w.winner_review ? (
                           <div className="bg-gray-50 rounded-lg p-3">
                             <div className="flex items-center justify-between mb-1">
-                              <div className="text-xs text-gray-500">사용자 코멘트</div>
+                              <div className="text-xs text-gray-500">{t('raffle.winners.commentLabel')}</div>
                               {w.review_approved ? (
-                                <span className="badge-green">노출중</span>
+                                <span className="badge-green">{t('raffle.winners.visible')}</span>
                               ) : (
-                                <span className="badge-gray">숨김</span>
+                                <span className="badge-gray">{t('raffle.winners.hidden')}</span>
                               )}
                             </div>
                             <p className="text-sm text-gray-700">&quot;{w.winner_review}&quot;</p>
@@ -522,7 +518,7 @@ export default function RafflePage() {
                                   onClick={() => {
                                     if (
                                       window.confirm(
-                                        '이 코멘트를 숨김 처리하시겠습니까?\n(앱 내 当選内訳에서 사라집니다)'
+                                        t('raffle.confirm.hideComment')
                                       )
                                     ) {
                                       hideComment.mutate(w.id)
@@ -531,20 +527,20 @@ export default function RafflePage() {
                                   className="text-xs text-red-600 hover:underline"
                                   disabled={hideComment.isPending}
                                 >
-                                  🚫 숨김 처리
+                                  {t('raffle.winners.hideAction')}
                                 </button>
                               </div>
                             )}
                           </div>
                         ) : (
                           <div className="text-xs text-gray-400">
-                            {w.claimed_at ? '코멘트 미작성' : '수령 전'}
+                            {w.claimed_at ? t('raffle.winners.noComment') : t('raffle.winners.notClaimed')}
                           </div>
                         )}
 
                         <div className="text-xs text-gray-400">
-                          지급방식: {w.delivery_method ?? '—'} · 당첨일:{' '}
-                          {new Date(w.created_at).toLocaleDateString('ko-KR')}
+                          {t('raffle.winners.deliveryMethod')}: {w.delivery_method ?? '—'} · {t('raffle.winners.wonAt')}:{' '}
+                          {formatJstDate(w.created_at)}
                         </div>
                       </div>
                     ))}
@@ -555,18 +551,18 @@ export default function RafflePage() {
               {/* 응모자 목록 (1인 1행 합산) */}
               <div className="card">
                 <h3 className="font-semibold text-gray-900 mb-3">
-                  응모자 ({uniqueUsers.toLocaleString()}명 / 티켓 {totalTickets.toLocaleString()}장)
+                  {t('raffle.entrants.title')} ({uniqueUsers.toLocaleString()}{t('raffle.peopleSuffix')} / {t('raffle.waiting.ticketsLabel')} {totalTickets.toLocaleString()}{t('raffle.waiting.ticketsUnit')})
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-100">
                       <tr className="text-xs text-gray-500">
-                        <th className="text-left  pb-2 pt-2 px-1">닉네임</th>
-                        <th className="text-right pb-2 pt-2 px-1">티켓</th>
-                        <th className="text-right pb-2 pt-2 px-1">소비 E</th>
-                        <th className="text-right pb-2 pt-2 px-1">최초 응모</th>
-                        <th className="text-right pb-2 pt-2 px-1">최근 응모</th>
-                        {canPickWinner && <th className="text-right pb-2 pt-2 px-1">선택</th>}
+                        <th className="text-left  pb-2 pt-2 px-1">{t('raffle.col.nickname')}</th>
+                        <th className="text-right pb-2 pt-2 px-1">{t('raffle.col.tickets')}</th>
+                        <th className="text-right pb-2 pt-2 px-1">{t('raffle.col.energySpent')}</th>
+                        <th className="text-right pb-2 pt-2 px-1">{t('raffle.col.firstEntry')}</th>
+                        <th className="text-right pb-2 pt-2 px-1">{t('raffle.col.lastEntry')}</th>
+                        {canPickWinner && <th className="text-right pb-2 pt-2 px-1">{t('raffle.col.select')}</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -590,14 +586,10 @@ export default function RafflePage() {
                               {ticketCount.toLocaleString()}
                             </td>
                             <td className="py-2 text-right text-gray-400 text-xs px-1 whitespace-nowrap">
-                              {e.first_entry_at
-                                ? new Date(e.first_entry_at).toLocaleDateString('ko-KR')
-                                : '—'}
+                              {e.first_entry_at ? formatJstDate(e.first_entry_at) : '—'}
                             </td>
                             <td className="py-2 text-right text-gray-400 text-xs px-1 whitespace-nowrap">
-                              {e.last_entry_at
-                                ? new Date(e.last_entry_at).toLocaleDateString('ko-KR')
-                                : '—'}
+                              {e.last_entry_at ? formatJstDate(e.last_entry_at) : '—'}
                             </td>
                             {canPickWinner && (
                               <td className="py-2 text-right px-1">
@@ -606,7 +598,7 @@ export default function RafflePage() {
                                   disabled={pickWinner.isPending}
                                   className="px-2 py-1 text-xs font-semibold bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg transition-colors whitespace-nowrap"
                                 >
-                                  🏆 당첨 지정
+                                  {t('raffle.entrants.pickButton')}
                                 </button>
                               </td>
                             )}
@@ -619,7 +611,7 @@ export default function RafflePage() {
                             colSpan={canPickWinner ? 6 : 5}
                             className="py-6 text-center text-gray-400 text-xs"
                           >
-                            응모자 없음
+                            {t('raffle.entrants.empty')}
                           </td>
                         </tr>
                       )}
@@ -633,17 +625,17 @@ export default function RafflePage() {
                       disabled={entryPage === 0}
                       className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-gray-50"
                     >
-                      ← 이전
+                      {t('common.prev')}
                     </button>
                     <span>
-                      {entryPage + 1} / {Math.ceil(entriesTotal / ENTRY_PAGE)} 페이지
+                      {entryPage + 1} / {Math.ceil(entriesTotal / ENTRY_PAGE)} {t('common.pageSuffix')}
                     </span>
                     <button
                       onClick={() => setEntryPage((p) => p + 1)}
                       disabled={(entryPage + 1) * ENTRY_PAGE >= entriesTotal}
                       className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-gray-50"
                     >
-                      다음 →
+                      {t('common.next')}
                     </button>
                   </div>
                 )}
