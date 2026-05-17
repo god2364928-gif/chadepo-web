@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstDateTimeShort, formatJstMonthDayTime } from '../../utils/jstFormat'
 
 const INQUIRY_BUCKET = 'inquiry-attachments'
 
 // PR-2.2 #6: バケットを private 化したため、画像表示時に signedUrl を発行する。
-// path 形式 (例: "<uid>/123_0.png") を受け取り、TTL 1h の URL を返す。
-// 万一 http(s) で始まる legacy データが残っていればそのまま返す。
+// path 형식 (예: "<uid>/123_0.png") を受け取り、TTL 1h の URL を返す。
+// 만일 http(s) で始まる legacy データが残아 있으면 그대로 반환.
 function SignedImage({ path, alt, className, openOnClick = false }) {
+  const { t } = useLanguage()
   const [url, setUrl] = useState(null)
   const [failed, setFailed] = useState(false)
 
@@ -42,7 +45,7 @@ function SignedImage({ path, alt, className, openOnClick = false }) {
       <div
         className={`${className ?? ''} bg-gray-100 flex items-center justify-center text-gray-400 text-[10px]`}
       >
-        画像なし
+        {t('inquiry.noImage')}
       </div>
     )
   }
@@ -59,11 +62,14 @@ function SignedImage({ path, alt, className, openOnClick = false }) {
   )
 }
 
-const FILTERS = [
-  { value: 'all', label: '전체' },
-  { value: 'pending', label: '미답변' },
-  { value: 'answered', label: '답변완료' },
-]
+function useFilters() {
+  const { t } = useLanguage()
+  return [
+    { value: 'all', label: t('inquiry.filter.all') },
+    { value: 'pending', label: t('inquiry.filter.pending') },
+    { value: 'answered', label: t('inquiry.filter.answered') },
+  ]
+}
 
 const CATEGORY_COLORS = {
   '利用方法（機能・使い方）': 'bg-blue-50 text-blue-700',
@@ -74,7 +80,7 @@ const CATEGORY_COLORS = {
   その他: 'bg-gray-100 text-gray-600',
 }
 
-// 不満理由コード → 表示ラベル (앱과 동일하게 유지)
+// 不満理由コード → 表示ラベル (앱과 동일하게 유지 — 일본어 그대로)
 const NEGATIVE_REASON_LABELS = {
   hard_to_understand: '理解しづらい',
   not_resolved: '問題が解決しない',
@@ -83,23 +89,13 @@ const NEGATIVE_REASON_LABELS = {
   other: 'その他',
 }
 
-function fmt(dt) {
-  return new Date(dt).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+// 問い合わせ表示は JST 固定 (運用ログ).
+function useFmt() {
+  return (dt) => formatJstDateTimeShort(dt)
 }
 
-function fmtTime(dt) {
-  return new Date(dt).toLocaleString('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+function useFmtTime() {
+  return (dt) => formatJstMonthDayTime(dt)
 }
 
 // ─────────────────────────────────────────────
@@ -108,6 +104,8 @@ function fmtTime(dt) {
 //         ユーザー側からの追記を即時反映する (stale 対策)。
 // ─────────────────────────────────────────────
 function ReplyModal({ inquiry: initialInquiry, onClose }) {
+  const { t } = useLanguage()
+  const fmt = useFmt()
   const qc = useQueryClient()
   const [replyBody, setReplyBody] = useState('')
   const [adminNote, setAdminNote] = useState('')
@@ -125,7 +123,7 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
           id, user_id, category, body, status, created_at,
           email, device_info, app_version, image_urls, priority, is_read_by_user,
           profiles!user_id(nickname),
-          messages:inquiry_messages(id, ticket_id, role, content, image_urls, created_at),
+          messages:inquiry_messages(id, ticket_id, role, content, image_urls, created_at, admin_note, notified_at),
           feedback:inquiry_feedback(rating, feedback_text, created_at)
         `
         )
@@ -174,7 +172,7 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
       onClose()
     } else {
       // eslint-disable-next-line no-alert
-      alert(`답변 전송 실패: ${error.message ?? '알 수 없는 오류'}`)
+      alert(`${t('inquiry.reply.sendFailed')}: ${error.message ?? t('inquiry.reply.unknownError')}`)
     }
   }
 
@@ -185,10 +183,10 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-gray-900">
-              문의 답변
+              {t('inquiry.reply.title')}
               {hasNewUserMessage && inquiry.status === 'pending' && (
                 <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-                  추가 질문
+                  {t('inquiry.followupQuestion')}
                 </span>
               )}
             </h3>
@@ -212,27 +210,27 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
               </span>
               <span className="text-xs text-gray-400">{fmt(inquiry.created_at)}</span>
               <span className="text-xs text-gray-500 font-medium">
-                {inquiry.profiles?.nickname ?? `ユーザー${inquiry.user_id?.slice(0, 4)}`}
+                {inquiry.profiles?.nickname ?? `${t('inquiry.userPrefix')}${inquiry.user_id?.slice(0, 4)}`}
               </span>
             </div>
 
             {/* 자동 수집된 사용자 식별 정보 (PR-1) */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs space-y-1.5">
               <InfoRow
-                label="회원 ID"
+                label={t('inquiry.info.memberId')}
                 value={inquiry.user_id ? `u_${inquiry.user_id.slice(0, 8)}` : '-'}
                 mono
               />
               <InfoRow
-                label="連絡先メール"
-                value={inquiry.email ?? '(미입력)'}
+                label={t('inquiry.info.email')}
+                value={inquiry.email ?? t('inquiry.info.notEntered')}
                 mono
                 copyable={!!inquiry.email}
               />
-              <InfoRow label="端末情報" value={inquiry.device_info ?? '(미수집 — 旧バージョン)'} />
+              <InfoRow label={t('inquiry.info.device')} value={inquiry.device_info ?? t('inquiry.info.notCollected')} />
               <InfoRow
-                label="アプリバージョン"
-                value={inquiry.app_version ?? '(미수집 — 旧バージョン)'}
+                label={t('inquiry.info.appVersion')}
+                value={inquiry.app_version ?? t('inquiry.info.notCollected')}
                 mono
               />
             </div>
@@ -244,7 +242,7 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
           {/* 채팅 형식 메시지 스레드 (PR-2) */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              대화 내역 ({messages.length}건)
+              {t('inquiry.threadTitle')} ({messages.length}{t('inquiry.countUnit')})
             </p>
             {messages.length === 0 ? (
               // 폴백: messages가 비어있으면 inquiry.body를 표시
@@ -262,6 +260,8 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
                   content={m.content}
                   createdAt={m.created_at}
                   imageUrls={m.image_urls}
+                  adminNote={m.admin_note}
+                  notifiedAt={m.notified_at}
                 />
               ))
             )}
@@ -270,13 +270,13 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
               (inquiry.image_urls?.length ?? 0) > 0 &&
               !messages.some((m) => (m.image_urls?.length ?? 0) > 0) && (
                 <div className="pl-2">
-                  <p className="text-xs text-gray-400 mb-1">최초 문의 첨부:</p>
+                  <p className="text-xs text-gray-400 mb-1">{t('inquiry.initialAttachment')}</p>
                   <div className="flex flex-wrap gap-2">
                     {inquiry.image_urls.map((p, i) => (
                       <SignedImage
                         key={i}
                         path={p}
-                        alt={`添付画像 ${i + 1}`}
+                        alt={`${t('inquiry.attachmentAlt')} ${i + 1}`}
                         openOnClick
                         className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:opacity-80 cursor-zoom-in"
                       />
@@ -291,27 +291,27 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
             <div className="space-y-3 border-t border-gray-100 pt-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  답변 내용 <span className="text-red-500">*</span>
-                  <span className="text-gray-400 font-normal ml-1">(사용자에게 표시)</span>
+                  {t('inquiry.reply.bodyLabel')} <span className="text-red-500">*</span>
+                  <span className="text-gray-400 font-normal ml-1">{t('inquiry.reply.bodyHint')}</span>
                 </label>
                 <textarea
                   rows={6}
                   value={replyBody}
                   onChange={(e) => setReplyBody(e.target.value)}
-                  placeholder="사용자에게 전달할 답변을 입력하세요..."
+                  placeholder={t('inquiry.reply.bodyPlaceholder')}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand resize-none"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  내부 메모
-                  <span className="text-gray-400 font-normal ml-1">(사용자 비표시)</span>
+                  {t('inquiry.reply.noteLabel')}
+                  <span className="text-gray-400 font-normal ml-1">{t('inquiry.reply.noteHint')}</span>
                 </label>
                 <textarea
                   rows={2}
                   value={adminNote}
                   onChange={(e) => setAdminNote(e.target.value)}
-                  placeholder="대응 이력, 참고사항 등 (선택)"
+                  placeholder={t('inquiry.reply.notePlaceholder')}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand resize-none"
                 />
               </div>
@@ -322,7 +322,7 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
         {/* 푸터 */}
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button onClick={onClose} className="btn-secondary">
-            닫기
+            {t('common.close')}
           </button>
           {inquiry.status === 'pending' && (
             <button
@@ -330,7 +330,7 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
               disabled={!replyBody.trim() || sending}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {sending ? '전송 중...' : hasNewUserMessage ? '추가 답변 전송' : '답변 전송'}
+              {sending ? t('inquiry.reply.sending') : hasNewUserMessage ? t('inquiry.reply.sendFollowup') : t('inquiry.reply.send')}
             </button>
           )}
         </div>
@@ -342,16 +342,27 @@ function ReplyModal({ inquiry: initialInquiry, onClose }) {
 // ─────────────────────────────────────────────
 // 채팅 말풍선 (user / support)
 // ─────────────────────────────────────────────
-function ChatBubble({ role, content, createdAt, imageUrls = [] }) {
+function ChatBubble({ role, content, createdAt, imageUrls = [], adminNote = null, notifiedAt = null }) {
+  const { t } = useLanguage()
+  const fmtTime = useFmtTime()
   const isUser = role === 'user'
+  const isSupport = role === 'support'
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
         <div className="flex items-center gap-1.5 mb-1 text-[11px] text-gray-400">
           <span className={`font-medium ${isUser ? 'text-blue-600' : 'text-green-600'}`}>
-            {isUser ? '🧑‍💼 사용자' : '🛟 사포트 답변'}
+            {isUser ? t('inquiry.bubble.user') : t('inquiry.bubble.support')}
           </span>
           <span>{fmtTime(createdAt)}</span>
+          {isSupport &&
+            (notifiedAt ? (
+              <span className="text-gray-500">
+                · {t('inquiry.bubble.pushSent')} {fmtTime(notifiedAt)}
+              </span>
+            ) : (
+              <span className="text-gray-300">· {t('inquiry.bubble.pushNotRecorded')}</span>
+            ))}
         </div>
         <div
           className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
@@ -367,7 +378,7 @@ function ChatBubble({ role, content, createdAt, imageUrls = [] }) {
                 <SignedImage
                   key={i}
                   path={p}
-                  alt={`添付画像 ${i + 1}`}
+                  alt={`${t('inquiry.attachmentAlt')} ${i + 1}`}
                   openOnClick
                   className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:opacity-80 cursor-zoom-in"
                 />
@@ -375,6 +386,12 @@ function ChatBubble({ role, content, createdAt, imageUrls = [] }) {
             </div>
           )}
         </div>
+        {isSupport && adminNote && (
+          <div className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 whitespace-pre-wrap max-w-full">
+            <span className="font-medium">{t('inquiry.bubble.adminNote')}</span>
+            <span className="ml-1.5">{adminNote}</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -384,6 +401,8 @@ function ChatBubble({ role, content, createdAt, imageUrls = [] }) {
 // 만족도 배지 (모달 안)
 // ─────────────────────────────────────────────
 function FeedbackBadge({ feedback }) {
+  const { t } = useLanguage()
+  const fmt = useFmt()
   const isPos = feedback.rating === 'positive'
   const reason = feedback.feedback_text
     ? (NEGATIVE_REASON_LABELS[feedback.feedback_text] ?? feedback.feedback_text)
@@ -398,8 +417,8 @@ function FeedbackBadge({ feedback }) {
     >
       <span className="text-lg">{isPos ? '👍' : '👎'}</span>
       <div className="flex-1">
-        <span className="font-medium">{isPos ? '解決した' : '不満'}</span>
-        {reason && <span className="ml-2 text-xs opacity-80">理由: {reason}</span>}
+        <span className="font-medium">{isPos ? t('inquiry.feedback.resolved') : t('inquiry.feedback.unsatisfied')}</span>
+        {reason && <span className="ml-2 text-xs opacity-80">{t('inquiry.feedback.reason')}: {reason}</span>}
       </div>
       <span className="text-xs opacity-60">{fmt(feedback.created_at)}</span>
     </div>
@@ -408,6 +427,7 @@ function FeedbackBadge({ feedback }) {
 
 // 개별 정보 행 (label + value, 선택적으로 모노스페이스/복사 버튼)
 function InfoRow({ label, value, mono = false, copyable = false }) {
+  const { t } = useLanguage()
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
     try {
@@ -428,7 +448,7 @@ function InfoRow({ label, value, mono = false, copyable = false }) {
           className="text-[11px] text-blue-600 hover:underline shrink-0"
           type="button"
         >
-          {copied ? '✓ 복사됨' : '복사'}
+          {copied ? t('common.copied') : t('common.copy')}
         </button>
       )}
     </div>
@@ -441,6 +461,9 @@ const INQ_PAGE = 50
 // 메인 페이지
 // ─────────────────────────────────────────────
 export default function InquiryPage() {
+  const { t } = useLanguage()
+  const fmt = useFmt()
+  const FILTERS = useFilters()
   const [filter, setFilter] = useState('all')
   const [selected, setSelected] = useState(null)
   const [page, setPage] = useState(0)
@@ -497,13 +520,13 @@ export default function InquiryPage() {
     <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">문의 관리</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('inquiry.title')}</h1>
         <div className="flex gap-3 text-sm">
           <span className="bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full font-medium">
-            미답변 {summary?.pending ?? 0}건
+            {t('inquiry.filter.pending')} {summary?.pending ?? 0}{t('inquiry.countUnit')}
           </span>
           <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full font-medium">
-            답변완료 {summary?.answered ?? 0}건
+            {t('inquiry.filter.answered')} {summary?.answered ?? 0}{t('inquiry.countUnit')}
           </span>
         </div>
       </div>
@@ -525,7 +548,7 @@ export default function InquiryPage() {
         ))}
         {total > 0 && (
           <span className="ml-auto self-center text-xs text-gray-400">
-            전체 {total.toLocaleString()}건
+            {t('common.totalLabel')} {total.toLocaleString()}{t('inquiry.countUnit')}
           </span>
         )}
       </div>
@@ -533,21 +556,21 @@ export default function InquiryPage() {
       {/* 목록 */}
       <div className="card p-0 overflow-hidden">
         {isLoading ? (
-          <div className="py-16 text-center text-gray-400 text-sm">読み込み中...</div>
+          <div className="py-16 text-center text-gray-400 text-sm">{t('common.loading')}</div>
         ) : inquiries.length === 0 ? (
-          <div className="py-16 text-center text-gray-400 text-sm">문의가 없습니다</div>
+          <div className="py-16 text-center text-gray-400 text-sm">{t('inquiry.empty')}</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">상태</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">평가</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">접수일시</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">유저</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">유형</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">단말</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">대화</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">답변</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('inquiry.column.status')}</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('inquiry.column.rating')}</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('inquiry.column.receivedAt')}</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('inquiry.column.user')}</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('inquiry.column.category')}</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('inquiry.column.device')}</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('inquiry.column.body')}</th>
+                <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('inquiry.column.action')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -575,13 +598,13 @@ export default function InquiryPage() {
                       {inq.status === 'pending' ? (
                         isReQuestion ? (
                           <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">
-                            추가 질문
+                            {t('inquiry.followupQuestion')}
                           </span>
                         ) : (
-                          <span className="badge-yellow">미답변</span>
+                          <span className="badge-yellow">{t('inquiry.filter.pending')}</span>
                         )
                       ) : (
-                        <span className="badge-green">완료</span>
+                        <span className="badge-green">{t('inquiry.status.done')}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-center">
@@ -604,7 +627,7 @@ export default function InquiryPage() {
                       {fmt(inq.created_at)}
                     </td>
                     <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                      {inq.profiles?.nickname ?? `ユーザー${inq.user_id?.slice(0, 4)}`}
+                      {inq.profiles?.nickname ?? `${t('inquiry.userPrefix')}${inq.user_id?.slice(0, 4)}`}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -622,7 +645,7 @@ export default function InquiryPage() {
                     <td className="px-4 py-3 text-gray-700 max-w-xs">
                       <p className="truncate">{inq.body}</p>
                       {msgCount > 1 && (
-                        <p className="text-[11px] text-gray-400 mt-0.5">+{msgCount - 1}개 메시지</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">+{msgCount - 1}{t('inquiry.messagesUnit')}</p>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -634,7 +657,7 @@ export default function InquiryPage() {
                             : 'btn-secondary text-xs py-1.5 px-3'
                         }
                       >
-                        {inq.status === 'pending' ? '답변하기' : '내용 보기'}
+                        {inq.status === 'pending' ? t('inquiry.action.reply') : t('inquiry.action.view')}
                       </button>
                     </td>
                   </tr>
@@ -652,17 +675,17 @@ export default function InquiryPage() {
             disabled={page === 0}
             className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
           >
-            ← 이전
+            {t('common.prev')}
           </button>
           <span>
-            {page + 1} / {Math.ceil(total / INQ_PAGE)} 페이지
+            {page + 1} / {Math.ceil(total / INQ_PAGE)} {t('common.pageUnit')}
           </span>
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={(page + 1) * INQ_PAGE >= total}
             className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
           >
-            다음 →
+            {t('common.next')}
           </button>
         </div>
       )}

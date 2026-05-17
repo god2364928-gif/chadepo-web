@@ -2,25 +2,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
-
-const ACTION_META = {
-  requested: { label: 'requested', cls: 'bg-yellow-100 text-yellow-700', desc: '삭제 신청' },
-  cancelled: { label: 'cancelled', cls: 'bg-blue-100 text-blue-700', desc: '신청 취소' },
-  purged: { label: 'purged', cls: 'bg-red-100 text-red-700', desc: '실삭제 완료' },
-}
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstDateTimeShort } from '../../utils/jstFormat'
 
 const LIMITS = [50, 100, 200, 500]
-
-function fmtDateTime(ts) {
-  if (!ts) return '—'
-  return new Date(ts).toLocaleString('ko-KR', {
-    year: '2-digit',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function shortHash(h) {
   if (!h) return '—'
@@ -29,6 +14,16 @@ function shortHash(h) {
 }
 
 export default function AccountLifecyclePage() {
+  const { t } = useLanguage()
+
+  // 削除/凍結ログは運用記録なので JST 固定で揃える.
+  const fmtDateTime = (ts) => (ts ? formatJstDateTimeShort(ts) : '—')
+
+  const ACTION_META = {
+    requested: { label: 'requested', cls: 'bg-yellow-100 text-yellow-700', desc: t('accountLifecycle.actionDesc.requested') },
+    cancelled: { label: 'cancelled', cls: 'bg-blue-100 text-blue-700', desc: t('accountLifecycle.actionDesc.cancelled') },
+    purged: { label: 'purged', cls: 'bg-red-100 text-red-700', desc: t('accountLifecycle.actionDesc.purged') },
+  }
   // 삭제 로그 필터
   const [action, setAction] = useState('')
   const [from, setFrom] = useState('')
@@ -91,16 +86,16 @@ export default function AccountLifecyclePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">🗑️ 계정 정지/삭제</h1>
+        <h1 className="text-2xl font-bold text-gray-900">🗑️ {t('accountLifecycle.title')}</h1>
         <p className="text-xs text-gray-500 mt-1">
-          계정 삭제 감사 로그 + 정지된 이메일 해시 (재가입 차단)
+          {t('accountLifecycle.subtitle')}
         </p>
       </div>
 
       {/* ───────────── 1. 계정 삭제 로그 ───────────── */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">계정 삭제 로그</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('accountLifecycle.logSectionTitle')}</h2>
           <div className="text-xs text-gray-400 flex gap-3 items-center">
             <span>
               requested <b className="text-yellow-700">{counts.requested}</b>
@@ -111,8 +106,8 @@ export default function AccountLifecyclePage() {
             <span>
               purged <b className="text-red-700">{counts.purged}</b>
             </span>
-            <span className="text-[10px] text-gray-300" title="RPC 최대 limit 안에서 잡힌 행만 카운트한 값입니다. 전체 누적값이 아닙니다.">
-              (표시된 {logs?.length ?? 0}건 기준)
+            <span className="text-[10px] text-gray-300" title={t('accountLifecycle.countLimitTooltip')}>
+              {t('accountLifecycle.displayedPrefix')}{logs?.length ?? 0}{t('accountLifecycle.displayedSuffix')}
             </span>
           </div>
         </div>
@@ -127,10 +122,10 @@ export default function AccountLifecyclePage() {
                 onChange={(e) => setAction(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
               >
-                <option value="">전체</option>
-                <option value="requested">requested (삭제 신청)</option>
-                <option value="cancelled">cancelled (신청 취소)</option>
-                <option value="purged">purged (실삭제)</option>
+                <option value="">{t('accountLifecycle.filter.actionAll')}</option>
+                <option value="requested">{t('accountLifecycle.filter.actionRequested')}</option>
+                <option value="cancelled">{t('accountLifecycle.filter.actionCancelled')}</option>
+                <option value="purged">{t('accountLifecycle.filter.actionPurged')}</option>
               </select>
             </div>
             <div>
@@ -152,7 +147,7 @@ export default function AccountLifecyclePage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">표시 건수</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('accountLifecycle.filter.limitLabel')}</label>
               <select
                 value={logLimit}
                 onChange={(e) => setLogLimit(Number(e.target.value))}
@@ -160,7 +155,7 @@ export default function AccountLifecyclePage() {
               >
                 {LIMITS.map((n) => (
                   <option key={n} value={n}>
-                    {n}건
+                    {n}{t('accountLifecycle.unit.records')}
                   </option>
                 ))}
               </select>
@@ -170,28 +165,28 @@ export default function AccountLifecyclePage() {
 
         {/* 결과 */}
         {logsError ? (
-          <div className="card text-red-600 text-sm">로그 불러오기 실패: {logsError.message}</div>
+          <div className="card text-red-600 text-sm">{t('accountLifecycle.logLoadFailed')}{logsError.message}</div>
         ) : logsLoading ? (
-          <div className="card py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+          <div className="card py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
         ) : (logs ?? []).length === 0 ? (
-          <div className="card py-12 text-center text-gray-400 text-sm">조건에 맞는 로그 없음</div>
+          <div className="card py-12 text-center text-gray-400 text-sm">{t('accountLifecycle.logEmpty')}</div>
         ) : (
           <div className="card p-0 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
               <span className="text-xs text-gray-500">
-                총 {logs.length.toLocaleString()}건 (최신순)
+                {t('accountLifecycle.totalPrefix')}{logs.length.toLocaleString()}{t('accountLifecycle.totalSuffixNewest')}
               </span>
               <span className="text-[10px] text-gray-400">
-                ※ purge 된 행은 profiles 가 삭제되어 상세를 열 수 없으므로 (purged) 로 표시됩니다
+                {t('accountLifecycle.purgeNote')}
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
                   <tr>
-                    <th className="text-left  px-4 py-3 font-medium">시각</th>
+                    <th className="text-left  px-4 py-3 font-medium">{t('accountLifecycle.col.time')}</th>
                     <th className="text-left  px-4 py-3 font-medium">action</th>
-                    <th className="text-left  px-4 py-3 font-medium">유저</th>
+                    <th className="text-left  px-4 py-3 font-medium">{t('accountLifecycle.col.user')}</th>
                     <th className="text-left  px-4 py-3 font-medium">email_hash</th>
                   </tr>
                 </thead>
@@ -244,9 +239,9 @@ export default function AccountLifecyclePage() {
       {/* ───────────── 2. 정지된 이메일 해시 ───────────── */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">정지된 이메일 해시</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('accountLifecycle.hashSectionTitle')}</h2>
           <span className="text-xs text-gray-400">
-            ※ purge 시 자동 차단되어 동일 이메일로 재가입 불가
+            {t('accountLifecycle.hashSectionNote')}
           </span>
         </div>
 
@@ -254,17 +249,17 @@ export default function AccountLifecyclePage() {
         <div className="card">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">검색 (해시 또는 사유)</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('accountLifecycle.hashFilter.searchLabel')}</label>
               <input
                 type="text"
                 value={banSearch}
                 onChange={(e) => setBanSearch(e.target.value)}
-                placeholder="email_hash / banned_reason 부분일치"
+                placeholder={t('accountLifecycle.hashFilter.searchPlaceholder')}
                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">표시 건수</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('accountLifecycle.filter.limitLabel')}</label>
               <select
                 value={banLimit}
                 onChange={(e) => setBanLimit(Number(e.target.value))}
@@ -272,7 +267,7 @@ export default function AccountLifecyclePage() {
               >
                 {LIMITS.map((n) => (
                   <option key={n} value={n}>
-                    {n}건
+                    {n}{t('accountLifecycle.unit.records')}
                   </option>
                 ))}
               </select>
@@ -283,26 +278,26 @@ export default function AccountLifecyclePage() {
         {/* 결과 */}
         {hashesError ? (
           <div className="card text-red-600 text-sm">
-            정지 해시 불러오기 실패: {hashesError.message}
+            {t('accountLifecycle.hashLoadFailed')}{hashesError.message}
           </div>
         ) : hashesLoading ? (
-          <div className="card py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+          <div className="card py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
         ) : (hashes ?? []).length === 0 ? (
-          <div className="card py-12 text-center text-gray-400 text-sm">정지된 해시 없음 ✅</div>
+          <div className="card py-12 text-center text-gray-400 text-sm">{t('accountLifecycle.hashEmpty')} ✅</div>
         ) : (
           <div className="card p-0 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200">
               <span className="text-xs text-gray-500">
-                총 {hashes.length.toLocaleString()}건 (최신 차단순)
+                {t('accountLifecycle.totalPrefix')}{hashes.length.toLocaleString()}{t('accountLifecycle.totalSuffixNewestBan')}
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
                   <tr>
-                    <th className="text-left  px-4 py-3 font-medium">차단 시각</th>
+                    <th className="text-left  px-4 py-3 font-medium">{t('accountLifecycle.col.banTime')}</th>
                     <th className="text-left  px-4 py-3 font-medium">email_hash</th>
-                    <th className="text-left  px-4 py-3 font-medium">사유</th>
+                    <th className="text-left  px-4 py-3 font-medium">{t('accountLifecycle.col.reason')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">

@@ -2,20 +2,25 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstDateTime } from '../../utils/jstFormat'
 
 // auth.users 의 OAuth 메타데이터를 사람이 읽기 좋게 정리해 보여주는 카드.
 // admin_get_user_oauth_info RPC 의 응답 (jsonb) 을 그대로 받는다.
 function SocialAccountCard({ info }) {
+  const { t } = useLanguage()
+
   if (!info) {
     return (
       <div className="card space-y-3">
-        <h2 className="font-semibold text-gray-900">소셜 계정 정보</h2>
+        <h2 className="font-semibold text-gray-900">{t('users.detail.social.title')}</h2>
         <div className="text-gray-400 text-sm">読み込み中...</div>
       </div>
     )
   }
 
-  const fmt = (ts) => (ts ? new Date(ts).toLocaleString('ko-KR') : '—')
+  // 運用ログは JST 固定表示.
+  const fmt = (ts) => (ts ? formatJstDateTime(ts) : '—')
 
   // 이메일 표시: dummy / Apple 비공개 / 일반 을 라벨로 분리
   const renderEmail = () => {
@@ -23,7 +28,7 @@ function SocialAccountCard({ info }) {
     if (info.email_is_dummy) {
       return (
         <span className="text-gray-400">
-          미공개 <span className="text-xs">(LINE 미동의)</span>
+          {t('users.detail.social.emailHidden')} <span className="text-xs">{t('users.detail.social.lineNotConsented')}</span>
         </span>
       )
     }
@@ -31,20 +36,20 @@ function SocialAccountCard({ info }) {
       <span className="break-all">
         {info.email}
         {info.email_is_apple_relay && (
-          <span className="ml-1 text-xs badge-gray align-middle">Apple 비공개</span>
+          <span className="ml-1 text-xs badge-gray align-middle">{t('users.detail.social.applePrivate')}</span>
         )}
       </span>
     )
   }
 
   const rows = [
-    ['표시 이름', info.display_name ?? '—'],
-    ['이메일', renderEmail()],
-    ['이메일 인증', info.email_confirmed_at ? '✅ 인증됨' : '미인증'],
-    ['플랫폼', info.provider ?? '—'],
-    ['플랫폼 ID', info.provider_sub ?? '—'],
-    ['OAuth 가입', fmt(info.created_at)],
-    ['최근 로그인', fmt(info.last_sign_in_at)],
+    [t('users.detail.social.displayName'), info.display_name ?? '—'],
+    [t('users.detail.social.email'), renderEmail()],
+    [t('users.detail.social.emailVerified'), info.email_confirmed_at ? `✅ ${t('users.detail.social.verified')}` : t('users.detail.social.notVerified')],
+    [t('users.detail.social.provider'), info.provider ?? '—'],
+    [t('users.detail.social.providerId'), info.provider_sub ?? '—'],
+    [t('users.detail.social.oauthSignup'), fmt(info.created_at)],
+    [t('users.detail.social.lastSignIn'), fmt(info.last_sign_in_at)],
   ]
 
   return (
@@ -65,7 +70,7 @@ function SocialAccountCard({ info }) {
             no img
           </div>
         )}
-        <h2 className="font-semibold text-gray-900">소셜 계정 정보</h2>
+        <h2 className="font-semibold text-gray-900">{t('users.detail.social.title')}</h2>
       </div>
       <dl className="space-y-2 text-sm">
         {rows.map(([k, v]) => (
@@ -80,6 +85,7 @@ function SocialAccountCard({ info }) {
 }
 
 function AdjustModal({ type, userId, onClose }) {
+  const { t } = useLanguage()
   const qc = useQueryClient()
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
@@ -89,7 +95,7 @@ function AdjustModal({ type, userId, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!note.trim()) {
-      setMsg('사유를 입력해주세요.')
+      setMsg(t('users.detail.adjust.reasonRequired'))
       return
     }
     setLoading(true)
@@ -101,7 +107,7 @@ function AdjustModal({ type, userId, onClose }) {
     })
     setLoading(false)
     if (error) {
-      setMsg('오류: ' + error.message)
+      setMsg(`${t('common.errorPrefix')}${error.message}`)
       return
     }
     qc.invalidateQueries({ queryKey: ['user', userId] })
@@ -113,40 +119,40 @@ function AdjustModal({ type, userId, onClose }) {
       <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
         <div className="px-6 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900">
-            {type === 'point' ? '포인트' : '에너지'} 수동 조정
+            {type === 'point' ? t('users.detail.adjust.titlePoint') : t('users.detail.adjust.titleEnergy')}
           </h3>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              조정 금액 (음수 입력 시 차감)
+              {t('users.detail.adjust.amountLabel')}
             </label>
             <input
               type="number"
               className="input"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="예: 1000 또는 -500"
+              placeholder={t('users.detail.adjust.amountPlaceholder')}
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">사유 (필수)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('users.detail.adjust.reasonLabel')}</label>
             <textarea
               className="input h-20 resize-none"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="예: 버그로 인한 누락 보상 지급"
+              placeholder={t('users.detail.adjust.reasonPlaceholder')}
               required
             />
           </div>
           {msg && <p className="text-red-600 text-sm">{msg}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={onClose} className="btn-secondary">
-              취소
+              {t('common.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? '처리 중...' : '적용'}
+              {loading ? t('common.processing') : t('common.apply')}
             </button>
           </div>
         </form>
@@ -160,6 +166,7 @@ function AdjustModal({ type, userId, onClose }) {
 // 변경 전/후 값과 사유가 자동 기록된다. RLS 강화 (2026_04_28) 로 profiles.is_flagged
 // / is_banned 직접 UPDATE 가 막혀 있어 반드시 이 RPC 경로를 사용해야 한다.
 function ReasonModal({ modal, userId, onClose }) {
+  const { t } = useLanguage()
   const qc = useQueryClient()
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
@@ -169,28 +176,28 @@ function ReasonModal({ modal, userId, onClose }) {
   const title =
     kind === 'flag'
       ? nextValue
-        ? '의심 플래그 설정'
-        : '의심 플래그 해제'
+        ? t('users.detail.reasonModal.flagOn')
+        : t('users.detail.reasonModal.flagOff')
       : nextValue
-        ? '계정 정지'
-        : '계정 정지 해제'
+        ? t('users.detail.reasonModal.banOn')
+        : t('users.detail.reasonModal.banOff')
   const desc =
     kind === 'flag'
       ? nextValue
-        ? '부정이용 의심으로 표시합니다.'
-        : '의심 플래그를 해제합니다.'
+        ? t('users.detail.reasonModal.descFlagOn')
+        : t('users.detail.reasonModal.descFlagOff')
       : nextValue
-        ? '앱 접근을 차단합니다.'
-        : '정지를 해제하고 정상 상태로 복귀합니다.'
+        ? t('users.detail.reasonModal.descBanOn')
+        : t('users.detail.reasonModal.descBanOff')
   const placeholder =
     kind === 'ban' && nextValue
-      ? '예: 동일 IP 에서 5계정 연속 가입, 추천 보상 어뷰징 정황'
-      : '운영자 메모용. admin_audit_log 에 기록됩니다.'
+      ? t('users.detail.reasonModal.placeholderBan')
+      : t('users.detail.reasonModal.placeholderDefault')
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!reason.trim()) {
-      setMsg('사유를 입력해주세요.')
+      setMsg(t('users.detail.adjust.reasonRequired'))
       return
     }
     setLoading(true)
@@ -213,7 +220,7 @@ function ReasonModal({ modal, userId, onClose }) {
         }))
       }
       if (error) {
-        setMsg('오류: ' + error.message)
+        setMsg(`${t('common.errorPrefix')}${error.message}`)
         return
       }
       // 상세 + 리스트/부정탐지 화면 캐시도 같이 무효화 (queryKey prefix match).
@@ -224,7 +231,7 @@ function ReasonModal({ modal, userId, onClose }) {
       onClose()
     } catch (e) {
       // 네트워크/세션 예외 — Supabase RPC 가 throw 한 경우
-      setMsg('오류: ' + (e?.message ?? String(e)))
+      setMsg(`${t('common.errorPrefix')}${e?.message ?? String(e)}`)
     } finally {
       setLoading(false)
     }
@@ -239,7 +246,7 @@ function ReasonModal({ modal, userId, onClose }) {
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">사유 (필수)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('users.detail.adjust.reasonLabel')}</label>
             <textarea
               className="input h-20 resize-none"
               value={reason}
@@ -256,10 +263,10 @@ function ReasonModal({ modal, userId, onClose }) {
               className="btn-secondary"
               disabled={loading}
             >
-              취소
+              {t('common.cancel')}
             </button>
             <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? '처리 중...' : '적용'}
+              {loading ? t('common.processing') : t('common.apply')}
             </button>
           </div>
         </form>
@@ -269,6 +276,7 @@ function ReasonModal({ modal, userId, onClose }) {
 }
 
 export default function UserDetail() {
+  const { t } = useLanguage()
   const { id } = useParams()
   const navigate = useNavigate()
   const [modal, setModal] = useState(null)
@@ -440,15 +448,15 @@ export default function UserDetail() {
   })
 
   if (isLoading) return <div className="text-gray-400 text-sm">読み込み中...</div>
-  if (!user) return <div className="text-red-500">유저를 찾을 수 없습니다.</div>
+  if (!user) return <div className="text-red-500">{t('users.detail.notFound')}</div>
 
   const tabs = [
-    { key: 'points', label: '포인트 이력' },
-    { key: 'energy', label: '에너지 이력' },
-    { key: 'exchange', label: '교환 이력' },
-    { key: 'referral', label: '추천 관계' },
-    { key: 'raffle', label: '당첨 이력' },
-    { key: 'audit', label: '감사 로그' },
+    { key: 'points', label: t('users.detail.tabs.points') },
+    { key: 'energy', label: t('users.detail.tabs.energy') },
+    { key: 'exchange', label: t('users.detail.tabs.exchange') },
+    { key: 'referral', label: t('users.detail.tabs.referral') },
+    { key: 'raffle', label: t('users.detail.tabs.raffle') },
+    { key: 'audit', label: t('users.detail.tabs.audit') },
   ]
 
   return (
@@ -460,7 +468,7 @@ export default function UserDetail() {
 
       <div className="flex items-center gap-3">
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-sm">
-          ← 뒤로
+          ← {t('common.back')}
         </button>
         {oauthInfo?.avatar_url ? (
           <img
@@ -479,18 +487,18 @@ export default function UserDetail() {
         {oauthInfo?.display_name ? (
           <span className="text-sm text-gray-400">({oauthInfo.display_name})</span>
         ) : null}
-        {user.is_banned && <span className="badge-red">정지</span>}
-        {user.is_flagged && <span className="badge-yellow">의심</span>}
+        {user.is_banned && <span className="badge-red">{t('users.list.status.banned')}</span>}
+        {user.is_flagged && <span className="badge-yellow">{t('users.list.status.flagged')}</span>}
         {user.deleted_at && (
           <span
             className="badge-gray"
             title={
               user.scheduled_deletion_at
-                ? `삭제 예정: ${new Date(user.scheduled_deletion_at).toLocaleString('ko-KR')}`
-                : '탈퇴 신청 (예정일 미설정)'
+                ? `${t('users.list.status.scheduledDeletionPrefix')}${formatJstDateTime(user.scheduled_deletion_at)}`
+                : t('users.list.status.deletionRequestedNoSchedule')
             }
           >
-            탈퇴 신청중
+            {t('users.detail.deletionRequestedBadge')}
           </span>
         )}
       </div>
@@ -498,26 +506,26 @@ export default function UserDetail() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {/* 기본 정보 */}
         <div className="card space-y-3">
-          <h2 className="font-semibold text-gray-900">기본 정보</h2>
+          <h2 className="font-semibold text-gray-900">{t('users.detail.basic.title')}</h2>
           <dl className="space-y-2 text-sm">
             {[
-              ['플랫폼', user.social_provider],
-              ['추천코드', user.referral_code],
-              ['가입일', user.created_at ? new Date(user.created_at).toLocaleString('ko-KR') : '—'],
+              [t('users.detail.basic.provider'), user.social_provider],
+              [t('users.detail.basic.referralCode'), user.referral_code],
+              [t('users.detail.basic.signupDate'), user.created_at ? formatJstDateTime(user.created_at) : '—'],
               [
-                '마지막 접속',
-                user.last_seen_at ? new Date(user.last_seen_at).toLocaleString('ko-KR') : '—',
+                t('users.detail.basic.lastSeen'),
+                user.last_seen_at ? formatJstDateTime(user.last_seen_at) : '—',
               ],
-              ['가입 IP', user.signup_ip ?? '—'],
+              [t('users.detail.basic.signupIp'), user.signup_ip ?? '—'],
               // R10: 탈퇴 신청 / 삭제 예정 (해당 유저만 노출 — 노이즈 제거)
               ...(user.deleted_at
-                ? [['탈퇴 신청일', new Date(user.deleted_at).toLocaleString('ko-KR')]]
+                ? [[t('users.detail.basic.deletionRequestedAt'), formatJstDateTime(user.deleted_at)]]
                 : []),
               ...(user.scheduled_deletion_at
                 ? [
                     [
-                      '삭제 예정일',
-                      new Date(user.scheduled_deletion_at).toLocaleString('ko-KR'),
+                      t('users.detail.basic.scheduledDeletionAt'),
+                      formatJstDateTime(user.scheduled_deletion_at),
                     ],
                   ]
                 : []),
@@ -537,55 +545,55 @@ export default function UserDetail() {
 
         {/* 잔액 */}
         <div className="card space-y-4">
-          <h2 className="font-semibold text-gray-900">잔액</h2>
+          <h2 className="font-semibold text-gray-900">{t('users.detail.balance.title')}</h2>
           <div className="space-y-3">
             <div className="bg-orange-50 rounded-lg p-4">
-              <div className="text-xs text-orange-600 font-medium">포인트</div>
+              <div className="text-xs text-orange-600 font-medium">{t('users.detail.balance.points')}</div>
               <div className="text-2xl font-bold text-orange-700 mt-1">
                 {user.points?.toLocaleString()} P
               </div>
               <div
                 className="text-xs text-orange-400 mt-0.5"
-                title="신정책 (2026-05-07): 교환 시 자체획득 1,000P 게이트 폐지. 본 수치는 참고용 누적값."
+                title={t('users.detail.balance.selfEarnedTooltip')}
               >
-                자체획득: {user.self_earned_points?.toLocaleString()} P
-                <span className="ml-1 text-[10px] text-gray-400">(참고용)</span>
+                {t('users.detail.balance.selfEarnedPrefix')}{user.self_earned_points?.toLocaleString()} P
+                <span className="ml-1 text-[10px] text-gray-400">{t('users.detail.balance.referenceSuffix')}</span>
               </div>
             </div>
             <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-xs text-blue-600 font-medium">에너지</div>
+              <div className="text-xs text-blue-600 font-medium">{t('users.detail.balance.energy')}</div>
               <div className="text-2xl font-bold text-blue-700 mt-1">
                 {user.energy?.toLocaleString()} E
               </div>
               <div
                 className="text-xs text-blue-400 mt-0.5"
-                title="아직 받지 않은 수령 대기 에너지. 앱의 받기 버튼 클릭 시 energy 로 이동."
+                title={t('users.detail.balance.pendingEnergyTooltip')}
               >
-                수령 대기: {(user.pending_energy ?? 0).toLocaleString()} E
+                {t('users.detail.balance.pendingEnergyPrefix')}{(user.pending_energy ?? 0).toLocaleString()} E
               </div>
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setModal('point')} className="btn-primary flex-1 text-xs py-1.5">
-              포인트 조정
+              {t('users.detail.balance.adjustPoint')}
             </button>
             <button
               onClick={() => setModal('energy')}
               className="btn-secondary flex-1 text-xs py-1.5"
             >
-              에너지 조정
+              {t('users.detail.balance.adjustEnergy')}
             </button>
           </div>
         </div>
 
         {/* 계정 관리 */}
         <div className="card space-y-4">
-          <h2 className="font-semibold text-gray-900">계정 관리</h2>
+          <h2 className="font-semibold text-gray-900">{t('users.detail.account.title')}</h2>
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div>
-                <div className="text-sm font-medium text-gray-900">의심 플래그</div>
-                <div className="text-xs text-gray-500">부정이용 의심 표시</div>
+                <div className="text-sm font-medium text-gray-900">{t('users.detail.account.flagTitle')}</div>
+                <div className="text-xs text-gray-500">{t('users.detail.account.flagDesc')}</div>
               </div>
               <button
                 onClick={() =>
@@ -595,14 +603,14 @@ export default function UserDetail() {
                   user.is_flagged ? 'badge-yellow cursor-pointer' : 'badge-gray cursor-pointer'
                 }
               >
-                {user.is_flagged ? '설정됨 (해제)' : '미설정 (설정)'}
+                {user.is_flagged ? t('users.detail.account.flagOnAction') : t('users.detail.account.flagOffAction')}
               </button>
             </div>
             <div className="p-3 bg-gray-50 rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-medium text-gray-900">계정 정지</div>
-                  <div className="text-xs text-gray-500">앱 접근 차단</div>
+                  <div className="text-sm font-medium text-gray-900">{t('users.detail.account.banTitle')}</div>
+                  <div className="text-xs text-gray-500">{t('users.detail.account.banDesc')}</div>
                 </div>
                 <button
                   onClick={() =>
@@ -612,12 +620,12 @@ export default function UserDetail() {
                     user.is_banned ? 'badge-red cursor-pointer' : 'badge-gray cursor-pointer'
                   }
                 >
-                  {user.is_banned ? '정지됨 (해제)' : '정상 (정지)'}
+                  {user.is_banned ? t('users.detail.account.banOnAction') : t('users.detail.account.banOffAction')}
                 </button>
               </div>
               {user.is_banned && user.banned_reason && (
                 <div className="text-xs text-red-700 border-t border-gray-200 pt-2 break-words">
-                  <span className="text-gray-500 font-medium">정지 사유: </span>
+                  <span className="text-gray-500 font-medium">{t('users.detail.account.banReasonLabel')}</span>
                   {user.banned_reason}
                 </div>
               )}
@@ -648,17 +656,17 @@ export default function UserDetail() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-gray-500 text-xs">
-                  <th className="text-left pb-2">일시</th>
-                  <th className="text-left pb-2">출처</th>
-                  <th className="text-right pb-2">금액</th>
-                  <th className="text-left pb-2 pl-4">메모</th>
+                  <th className="text-left pb-2">{t('users.detail.table.datetime')}</th>
+                  <th className="text-left pb-2">{t('users.detail.table.source')}</th>
+                  <th className="text-right pb-2">{t('users.detail.table.amount')}</th>
+                  <th className="text-left pb-2 pl-4">{t('users.detail.table.memo')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {(pointLogs ?? []).map((l) => (
                   <tr key={l.id}>
                     <td className="py-2 text-gray-400 text-xs whitespace-nowrap">
-                      {new Date(l.created_at).toLocaleString('ko-KR')}
+                      {formatJstDateTime(l.created_at)}
                     </td>
                     <td className="py-2">
                       <span className="badge-gray text-xs">{l.source}</span>
@@ -679,17 +687,17 @@ export default function UserDetail() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-gray-500 text-xs">
-                  <th className="text-left pb-2">일시</th>
-                  <th className="text-left pb-2">출처</th>
-                  <th className="text-right pb-2">금액</th>
-                  <th className="text-left pb-2 pl-4">메모</th>
+                  <th className="text-left pb-2">{t('users.detail.table.datetime')}</th>
+                  <th className="text-left pb-2">{t('users.detail.table.source')}</th>
+                  <th className="text-right pb-2">{t('users.detail.table.amount')}</th>
+                  <th className="text-left pb-2 pl-4">{t('users.detail.table.memo')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {(energyLogs ?? []).map((l) => (
                   <tr key={l.id}>
                     <td className="py-2 text-gray-400 text-xs whitespace-nowrap">
-                      {new Date(l.created_at).toLocaleString('ko-KR')}
+                      {formatJstDateTime(l.created_at)}
                     </td>
                     <td className="py-2">
                       <span className="badge-gray text-xs">{l.source}</span>
@@ -710,17 +718,17 @@ export default function UserDetail() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-gray-500 text-xs">
-                  <th className="text-left pb-2">일시</th>
-                  <th className="text-left pb-2">상품</th>
-                  <th className="text-right pb-2">소비 P</th>
-                  <th className="text-right pb-2">상태</th>
+                  <th className="text-left pb-2">{t('users.detail.table.datetime')}</th>
+                  <th className="text-left pb-2">{t('users.detail.exchangeTable.item')}</th>
+                  <th className="text-right pb-2">{t('users.detail.exchangeTable.consumedP')}</th>
+                  <th className="text-right pb-2">{t('users.detail.exchangeTable.status')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {(exchangeLogs ?? []).map((l) => (
                   <tr key={l.id}>
                     <td className="py-2 text-gray-400 text-xs whitespace-nowrap">
-                      {new Date(l.created_at).toLocaleString('ko-KR')}
+                      {formatJstDateTime(l.created_at)}
                     </td>
                     <td className="py-2">{l.exchange_items?.title_ja}</td>
                     <td className="py-2 text-right font-medium text-red-600">
@@ -739,18 +747,18 @@ export default function UserDetail() {
           {activeTab === 'referral' && (
             <div className="space-y-4 text-sm">
               <div>
-                <div className="font-medium text-gray-700 mb-2">초대해 준 사람</div>
+                <div className="font-medium text-gray-700 mb-2">{t('users.detail.referral.invitedBy')}</div>
                 {referralData?.referred ? (
                   <div className="p-3 bg-blue-50 rounded-lg">
-                    {referralData.referred.profiles?.nickname ?? '알 수 없음'}
+                    {referralData.referred.profiles?.nickname ?? t('common.unknown')}
                   </div>
                 ) : (
-                  <div className="text-gray-400">없음 (자체 가입)</div>
+                  <div className="text-gray-400">{t('users.detail.referral.noneSelfSignup')}</div>
                 )}
               </div>
               <div>
                 <div className="font-medium text-gray-700 mb-2">
-                  내가 초대한 사람 ({referralData?.referrals?.length ?? 0}명)
+                  {t('users.detail.referral.invitedByMePrefix')}({referralData?.referrals?.length ?? 0}{t('users.list.unit.person')})
                 </div>
                 <div className="space-y-1">
                   {(referralData?.referrals ?? []).map((r) => (
@@ -758,14 +766,14 @@ export default function UserDetail() {
                       key={r.id}
                       className="flex items-center justify-between p-2 bg-gray-50 rounded"
                     >
-                      <span>{r.profiles?.nickname ?? '알 수 없음'}</span>
+                      <span>{r.profiles?.nickname ?? t('common.unknown')}</span>
                       <span className={r.status === 'rewarded' ? 'badge-green' : 'badge-gray'}>
                         {r.status}
                       </span>
                     </div>
                   ))}
                   {referralData?.referrals?.length === 0 && (
-                    <div className="text-gray-400">초대한 사람 없음</div>
+                    <div className="text-gray-400">{t('users.detail.referral.noneInvited')}</div>
                   )}
                 </div>
               </div>
@@ -775,19 +783,19 @@ export default function UserDetail() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-gray-500 text-xs">
-                  <th className="text-left pb-2">당첨 일시</th>
-                  <th className="text-left pb-2">상품</th>
-                  <th className="text-left pb-2">회차</th>
-                  <th className="text-left pb-2">수령 상태</th>
-                  <th className="text-left pb-2">전달 방법</th>
-                  <th className="text-left pb-2 pl-4">코멘트</th>
+                  <th className="text-left pb-2">{t('users.detail.raffleTable.winAt')}</th>
+                  <th className="text-left pb-2">{t('users.detail.raffleTable.item')}</th>
+                  <th className="text-left pb-2">{t('users.detail.raffleTable.round')}</th>
+                  <th className="text-left pb-2">{t('users.detail.raffleTable.claimStatus')}</th>
+                  <th className="text-left pb-2">{t('users.detail.raffleTable.deliveryMethod')}</th>
+                  <th className="text-left pb-2 pl-4">{t('users.detail.raffleTable.comment')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {(raffleData ?? []).map((w) => (
                   <tr key={w.id} className="align-top">
                     <td className="py-2 text-gray-400 text-xs whitespace-nowrap">
-                      {new Date(w.created_at).toLocaleString('ko-KR')}
+                      {formatJstDateTime(w.created_at)}
                     </td>
                     <td className="py-2">{w.item_title ?? '—'}</td>
                     <td className="py-2 text-xs text-gray-500">
@@ -797,9 +805,9 @@ export default function UserDetail() {
                       {w.claimed_at ? (
                         <span className="badge-green">受取済</span>
                       ) : w.prize_delivered ? (
-                        <span className="badge-yellow">전달됨/미수령</span>
+                        <span className="badge-yellow">{t('users.detail.raffleTable.deliveredUnclaimed')}</span>
                       ) : (
-                        <span className="badge-gray">미전달</span>
+                        <span className="badge-gray">{t('users.detail.raffleTable.notDelivered')}</span>
                       )}
                     </td>
                     <td className="py-2 text-xs text-gray-500">{w.delivery_method ?? '—'}</td>
@@ -817,7 +825,7 @@ export default function UserDetail() {
                 {(raffleData ?? []).length === 0 && (
                   <tr>
                     <td colSpan={6} className="py-4 text-center text-gray-400 text-xs">
-                      당첨 이력 없음
+                      {t('users.detail.raffleTable.empty')}
                     </td>
                   </tr>
                 )}
@@ -828,18 +836,18 @@ export default function UserDetail() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-gray-500 text-xs">
-                  <th className="text-left pb-2">일시</th>
-                  <th className="text-left pb-2">액션</th>
-                  <th className="text-left pb-2">관리자</th>
-                  <th className="text-left pb-2">변경</th>
-                  <th className="text-left pb-2 pl-4">사유</th>
+                  <th className="text-left pb-2">{t('users.detail.table.datetime')}</th>
+                  <th className="text-left pb-2">{t('users.detail.auditTable.action')}</th>
+                  <th className="text-left pb-2">{t('users.detail.auditTable.admin')}</th>
+                  <th className="text-left pb-2">{t('users.detail.auditTable.change')}</th>
+                  <th className="text-left pb-2 pl-4">{t('users.detail.auditTable.reason')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {(auditLogs ?? []).map((l) => (
                   <tr key={l.id} className="align-top">
                     <td className="py-2 text-gray-400 text-xs whitespace-nowrap">
-                      {new Date(l.created_at).toLocaleString('ko-KR')}
+                      {formatJstDateTime(l.created_at)}
                     </td>
                     <td className="py-2">
                       <span className="badge-gray text-xs">{l.action}</span>
@@ -852,12 +860,12 @@ export default function UserDetail() {
                       )}
                     </td>
                     <td className="py-2 text-xs text-gray-600">
-                      <span className="text-gray-400">전:</span>{' '}
+                      <span className="text-gray-400">{t('users.detail.auditTable.beforeLabel')}</span>{' '}
                       <code className="text-[11px]">
                         {l.before_value === null ? '—' : JSON.stringify(l.before_value)}
                       </code>
                       <br />
-                      <span className="text-gray-400">후:</span>{' '}
+                      <span className="text-gray-400">{t('users.detail.auditTable.afterLabel')}</span>{' '}
                       <code className="text-[11px]">
                         {l.after_value === null ? '—' : JSON.stringify(l.after_value)}
                       </code>
@@ -868,7 +876,7 @@ export default function UserDetail() {
                 {(auditLogs ?? []).length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-4 text-center text-gray-400 text-xs">
-                      감사 로그 없음
+                      {t('users.detail.auditTable.empty')}
                     </td>
                   </tr>
                 )}

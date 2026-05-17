@@ -2,38 +2,31 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstDateTimeShort } from '../../utils/jstFormat'
 
 const PAGE = 50
-
-const fmtDate = (ts) => {
-  if (!ts) return '-'
-  const d = new Date(ts)
-  return d.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-}
-
-const SORT_COLS = {
-  created_at: { label: '가입일', asc: false },
-  points: { label: '포인트', asc: false },
-  energy: { label: '에너지', asc: false },
-  last_seen_at: { label: '마지막접속', asc: false },
-}
 
 // UUID v4/v5 형식. 입력이 정확히 이 형태면 id 일치 검색으로 전환한다.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export default function UserList() {
+  const { t } = useLanguage()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(0)
   const [sortCol, setSortCol] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
+
+  // 운영 시각은 JST 고정. ('-' 가 표시되면 값이 비어 있다는 뜻)
+  const fmtDate = (ts) => (ts ? formatJstDateTimeShort(ts) : '-')
+
+  const SORT_COLS = {
+    created_at: { label: t('users.list.sort.createdAt'), asc: false },
+    points: { label: t('users.list.sort.points'), asc: false },
+    energy: { label: t('users.list.sort.energy'), asc: false },
+    last_seen_at: { label: t('users.list.sort.lastSeen'), asc: false },
+  }
 
   const handleSort = (col) => {
     if (sortCol === col) {
@@ -125,15 +118,17 @@ export default function UserList() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">유저 관리</h1>
-        <p className="text-gray-500 text-sm mt-1">전체 {total.toLocaleString()}명</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('users.list.title')}</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          {t('users.list.totalPrefix')}{total.toLocaleString()}{t('users.list.totalSuffix')}
+        </p>
       </div>
 
       {/* 검색·필터 */}
       <div className="flex gap-3 flex-wrap items-center">
         <input
           className="input w-64"
-          placeholder="닉네임 / UUID / 추천코드 / 이메일 검색..."
+          placeholder={t('users.list.searchPlaceholder')}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value)
@@ -148,13 +143,13 @@ export default function UserList() {
             setPage(0)
           }}
         >
-          <option value="all">전체</option>
-          <option value="flagged">의심 유저</option>
-          <option value="banned">정지 계정</option>
-          <option value="deleted">탈퇴 신청중</option>
+          <option value="all">{t('users.list.filter.all')}</option>
+          <option value="flagged">{t('users.list.filter.flagged')}</option>
+          <option value="banned">{t('users.list.filter.banned')}</option>
+          <option value="deleted">{t('users.list.filter.deleted')}</option>
         </select>
         <div className="flex gap-2 ml-auto text-xs text-gray-400 items-center">
-          <span>정렬:</span>
+          <span>{t('users.list.sortLabel')}</span>
           {Object.entries(SORT_COLS).map(([col, { label }]) => (
             <button
               key={col}
@@ -177,21 +172,21 @@ export default function UserList() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">닉네임</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">가입방법</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('users.list.col.nickname')}</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('users.list.col.provider')}</th>
                 <th className="text-right px-4 py-3">
-                  <SortBtn col="energy" label="에너지" />
+                  <SortBtn col="energy" label={t('users.list.sort.energy')} />
                 </th>
                 <th className="text-right px-4 py-3">
-                  <SortBtn col="points" label="포인트" />
+                  <SortBtn col="points" label={t('users.list.sort.points')} />
                 </th>
                 <th className="text-right px-4 py-3">
-                  <SortBtn col="created_at" label="가입일" />
+                  <SortBtn col="created_at" label={t('users.list.sort.createdAt')} />
                 </th>
                 <th className="text-right px-4 py-3">
-                  <SortBtn col="last_seen_at" label="마지막접속" />
+                  <SortBtn col="last_seen_at" label={t('users.list.sort.lastSeen')} />
                 </th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
+                <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('users.list.col.status')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -231,22 +226,22 @@ export default function UserList() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1 flex-wrap">
-                          {u.is_banned && <span className="badge-red">정지</span>}
-                          {u.is_flagged && <span className="badge-yellow">의심</span>}
+                          {u.is_banned && <span className="badge-red">{t('users.list.status.banned')}</span>}
+                          {u.is_flagged && <span className="badge-yellow">{t('users.list.status.flagged')}</span>}
                           {u.deleted_at && (
                             <span
                               className="badge-gray"
                               title={
                                 u.scheduled_deletion_at
-                                  ? `삭제 예정: ${fmtDate(u.scheduled_deletion_at)}`
-                                  : '탈퇴 신청 (예정일 미설정)'
+                                  ? `${t('users.list.status.scheduledDeletionPrefix')}${fmtDate(u.scheduled_deletion_at)}`
+                                  : t('users.list.status.deletionRequestedNoSchedule')
                               }
                             >
-                              탈퇴신청중
+                              {t('users.list.status.deletionRequested')}
                             </span>
                           )}
                           {!u.is_banned && !u.is_flagged && !u.deleted_at && (
-                            <span className="badge-green">정상</span>
+                            <span className="badge-green">{t('users.list.status.normal')}</span>
                           )}
                         </div>
                       </td>
@@ -260,8 +255,8 @@ export default function UserList() {
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
           <span className="text-sm text-gray-500">
             {total === 0
-              ? '0명'
-              : `${page * PAGE + 1}–${Math.min((page + 1) * PAGE, total)} / ${total.toLocaleString()}명`}
+              ? `0${t('users.list.unit.person')}`
+              : `${page * PAGE + 1}–${Math.min((page + 1) * PAGE, total)} / ${total.toLocaleString()}${t('users.list.unit.person')}`}
           </span>
           <div className="flex gap-2">
             <button
@@ -269,14 +264,14 @@ export default function UserList() {
               disabled={page === 0}
               className="btn-secondary px-3 py-1 text-xs"
             >
-              이전
+              {t('common.prev')}
             </button>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={(page + 1) * PAGE >= total}
               className="btn-secondary px-3 py-1 text-xs"
             >
-              다음
+              {t('common.next')}
             </button>
           </div>
         </div>

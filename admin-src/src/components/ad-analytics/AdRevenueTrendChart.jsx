@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { supabase } from '../../lib/supabase'
 import { formatJstDate, formatJstMonthDay, formatUsd, formatInt } from '../../utils/jstFormat'
 
@@ -7,6 +8,7 @@ import { formatJstDate, formatJstMonthDay, formatUsd, formatInt } from '../../ut
 const PERIOD_TO_DAYS = { '1d': 1, '7d': 7, '30d': 30, '90d': 90 }
 
 export default function AdRevenueTrendChart({ period, adFormat, refreshKey }) {
+  const { t } = useLanguage()
   const days = PERIOD_TO_DAYS[period] ?? 7
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -43,26 +45,26 @@ export default function AdRevenueTrendChart({ period, adFormat, refreshKey }) {
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-gray-900 text-sm">수익 트렌드</h2>
+        <h2 className="font-semibold text-gray-900 text-sm">{t('ads.revenue.title')}</h2>
         <span className="text-xs text-gray-400">
-          최근 {days}일 (JST) · <span className="text-blue-600">● 수익(USD)</span> ·{' '}
-          <span className="text-gray-500">● 노출수</span>
+          {t('ads.revenue.recentPrefix')}{days}{t('ads.revenue.recentSuffix')} · <span className="text-blue-600">● {t('ads.revenue.legendRevenue')}</span> ·{' '}
+          <span className="text-gray-500">● {t('ads.revenue.legendImpressions')}</span>
         </span>
       </div>
       {error ? (
         <div className="px-4 py-6 text-center">
-          <p className="text-red-700 text-sm mb-2">불러오기 실패: {error.message}</p>
+          <p className="text-red-700 text-sm mb-2">{t('common.loadFailed')}: {error.message}</p>
           <button
             onClick={() => refetch()}
             className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
           >
-            다시 시도
+            {t('common.retry')}
           </button>
         </div>
       ) : isLoading ? (
-        <div className="py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+        <div className="py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
       ) : points.length === 0 ? (
-        <div className="py-12 text-center text-gray-400 text-sm">데이터가 없습니다</div>
+        <div className="py-12 text-center text-gray-400 text-sm">{t('common.noData')}</div>
       ) : (
         <TrendChart points={points} days={days} />
       )}
@@ -72,6 +74,7 @@ export default function AdRevenueTrendChart({ period, adFormat, refreshKey }) {
 
 // ─── SVG 차트 (이중축: 좌=revenue, 우=impression) ─────────────────────────
 function TrendChart({ points, days }) {
+  const { t } = useLanguage()
   const W = 880,
     H = 240,
     PAD_L = 56,
@@ -264,10 +267,10 @@ function TrendChart({ points, days }) {
                   {formatJstDate(s.date + 'T00:00:00+09:00')}
                 </text>
                 <text x={tipX + 8} y={tipY + 34} fontSize="11" fill="#3b82f6">
-                  수익: {s.revenue != null ? formatUsd(s.revenue) : '—'}
+                  {t('ads.revenue.tooltipRevenue')}: {s.revenue != null ? formatUsd(s.revenue) : '—'}
                 </text>
                 <text x={tipX + 8} y={tipY + 50} fontSize="11" fill="#6b7280">
-                  노출: {s.impression != null ? formatInt(s.impression) : '—'}
+                  {t('ads.revenue.tooltipImpressions')}: {s.impression != null ? formatInt(s.impression) : '—'}
                 </text>
               </g>
             )

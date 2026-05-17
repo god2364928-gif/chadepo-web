@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useState } from 'react'
 import GameAbuseLog from './GameAbuseLog'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstDate } from '../../utils/jstFormat'
 
 /** DB `public._try_flag_abusive_signup` 와 동일 상수 (마이그레이션 변경 시 여기도 맞출 것) */
 const SIGNUP_ABUSE = {
@@ -89,7 +91,7 @@ async function fetchReferralPayoutsByUser(supabase, userIds) {
 }
 
 /** 의심 유저 행에 자동 탐지 사유(기기/IP/소셜) 요약을 붙인다 */
-async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
+async function enrichFlaggedWithSignupAbuseReasons(supabase, rows, t) {
   const now = Date.now()
   const devCutoff = new Date(
     now - SIGNUP_ABUSE.devWindowDays * 24 * 60 * 60 * 1000,
@@ -108,17 +110,17 @@ async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
         const devCount = await countDeviceCluster(supabase, u, devCutoff)
         if (devCount >= SIGNUP_ABUSE.devThreshold) {
           hits.push(
-            `동일 기기·IDFV/지문 기준 최근 ${SIGNUP_ABUSE.devWindowDays}일 내 연계 계정 ${devCount}건 (의심 기준 ${SIGNUP_ABUSE.devThreshold}건 이상)`,
+            `${t('fraud.reason.deviceHit')} ${SIGNUP_ABUSE.devWindowDays}${t('fraud.reason.daysWithin')} ${devCount}${t('fraud.reason.casesOver')} ${SIGNUP_ABUSE.devThreshold}${t('fraud.reason.casesThresholdSuffix')}`,
           )
         } else if (u.idfv_or_ssaid || u.device_fingerprint) {
           refs.push(
-            `기기·IDFV 연계 ${devCount}건 / ${SIGNUP_ABUSE.devWindowDays}일 (기준 ${SIGNUP_ABUSE.devThreshold}건 미만)`,
+            `${t('fraud.reason.deviceRef')} ${devCount}${t('fraud.reason.casesCount')} / ${SIGNUP_ABUSE.devWindowDays}${t('fraud.reason.daysUnit')} (${t('fraud.reason.thresholdPrefix')} ${SIGNUP_ABUSE.devThreshold}${t('fraud.reason.casesUnder')})`,
           )
         } else {
-          refs.push('IDFV·기기 지문 없음')
+          refs.push(t('fraud.reason.noIdfv'))
         }
       } catch {
-        refs.push('기기 연계 집계를 불러오지 못했습니다.')
+        refs.push(t('fraud.reason.deviceFetchFail'))
       }
 
       if (u.signup_ip) {
@@ -132,18 +134,18 @@ async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
           const ipCount = count ?? 0
           if (ipCount >= SIGNUP_ABUSE.ipThreshold) {
             hits.push(
-              `동일 가입 IP 기준 최근 ${SIGNUP_ABUSE.ipWindowHours}시간 내 ${ipCount}건 (의심 기준 ${SIGNUP_ABUSE.ipThreshold}건 이상)`,
+              `${t('fraud.reason.ipHit')} ${SIGNUP_ABUSE.ipWindowHours}${t('fraud.reason.hoursWithin')} ${ipCount}${t('fraud.reason.casesOver')} ${SIGNUP_ABUSE.ipThreshold}${t('fraud.reason.casesThresholdSuffix')}`,
             )
           } else {
             refs.push(
-              `동일 IP ${ipCount}건 / ${SIGNUP_ABUSE.ipWindowHours}시간 (기준 ${SIGNUP_ABUSE.ipThreshold}건 미만)`,
+              `${t('fraud.reason.ipRef')} ${ipCount}${t('fraud.reason.casesCount')} / ${SIGNUP_ABUSE.ipWindowHours}${t('fraud.reason.hoursUnit')} (${t('fraud.reason.thresholdPrefix')} ${SIGNUP_ABUSE.ipThreshold}${t('fraud.reason.casesUnder')})`,
             )
           }
         } catch {
-          refs.push('IP 연계 집계를 불러오지 못했습니다.')
+          refs.push(t('fraud.reason.ipFetchFail'))
         }
       } else {
-        refs.push('가입 IP 없음(클라이언트 미전송 시 IP 규칙은 동작하지 않음)')
+        refs.push(t('fraud.reason.noSignupIp'))
       }
 
       if (u.social_sub_hash) {
@@ -157,18 +159,18 @@ async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
           const socCount = count ?? 0
           if (socCount >= SIGNUP_ABUSE.socialThreshold) {
             hits.push(
-              `동일 소셜 계정(해시) 기준 최근 ${SIGNUP_ABUSE.socialWindowDays}일 내 ${socCount}건 (의심 기준 ${SIGNUP_ABUSE.socialThreshold}건 이상)`,
+              `${t('fraud.reason.socialHit')} ${SIGNUP_ABUSE.socialWindowDays}${t('fraud.reason.daysWithin')} ${socCount}${t('fraud.reason.casesOver')} ${SIGNUP_ABUSE.socialThreshold}${t('fraud.reason.casesThresholdSuffix')}`,
             )
           } else {
             refs.push(
-              `동일 소셜 해시 ${socCount}건 / ${SIGNUP_ABUSE.socialWindowDays}일 (기준 ${SIGNUP_ABUSE.socialThreshold}건 미만)`,
+              `${t('fraud.reason.socialRef')} ${socCount}${t('fraud.reason.casesCount')} / ${SIGNUP_ABUSE.socialWindowDays}${t('fraud.reason.daysUnit')} (${t('fraud.reason.thresholdPrefix')} ${SIGNUP_ABUSE.socialThreshold}${t('fraud.reason.casesUnder')})`,
             )
           }
         } catch {
-          refs.push('소셜 해시 집계를 불러오지 못했습니다.')
+          refs.push(t('fraud.reason.socialFetchFail'))
         }
       } else {
-        refs.push('소셜 해시 없음')
+        refs.push(t('fraud.reason.noSocialHash'))
       }
 
       let summary
@@ -176,9 +178,9 @@ async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
         summary = hits.join('\n')
       } else {
         summary =
-          '현재 시점에서 자동 다중가입 탐지 임계값은 충족되지 않습니다.\n' +
-          '(수동 플래그, 또는 가입 이후 데이터·계정 수 변화 가능)\n' +
-          `참고: ${refs.join(' · ')}`
+          t('fraud.reason.noAutoThreshold') + '\n' +
+          t('fraud.reason.noAutoNote') + '\n' +
+          `${t('fraud.reason.referencePrefix')} ${refs.join(' · ')}`
       }
 
       const idfv = u.idfv_or_ssaid
@@ -192,7 +194,7 @@ async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
       return {
         ...u,
         _suspicionSummary: summary,
-        _devicePreview: `IDFV/SSAID: ${idfvShort} · 지문: ${fpShort}`,
+        _devicePreview: `IDFV/SSAID: ${idfvShort} · ${t('fraud.reason.fingerprintLabel')}: ${fpShort}`,
       }
     }),
   )
@@ -200,6 +202,7 @@ async function enrichFlaggedWithSignupAbuseReasons(supabase, rows) {
 
 export default function FraudPage() {
   const qc = useQueryClient()
+  const { t, lang } = useLanguage()
   const [tab, setTab] = useState('flagged')
 
   const {
@@ -207,7 +210,7 @@ export default function FraudPage() {
     isLoading: flaggedLoading,
     error: flaggedError,
   } = useQuery({
-    queryKey: ['flagged-users'],
+    queryKey: ['flagged-users', lang],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
@@ -218,7 +221,7 @@ export default function FraudPage() {
         .order('created_at', { ascending: false })
         .limit(200)
       if (error) throw error
-      const enriched = await enrichFlaggedWithSignupAbuseReasons(supabase, data ?? [])
+      const enriched = await enrichFlaggedWithSignupAbuseReasons(supabase, data ?? [], t)
       const payouts = await fetchReferralPayoutsByUser(
         supabase,
         enriched.map((u) => u.id),
@@ -319,10 +322,10 @@ export default function FraudPage() {
   })
 
   const tabs = [
-    { key: 'flagged', label: `🚨 의심 유저 (${flagged?.length ?? '…'})` },
-    { key: 'ip', label: '🔍 중복 IP 탐지' },
-    { key: 'balance', label: '💰 고액 보유자' },
-    { key: 'game_abuse', label: '🎮 게임 어뷰징 로그' },
+    { key: 'flagged', label: `🚨 ${t('fraud.tab.flagged')} (${flagged?.length ?? '…'})` },
+    { key: 'ip', label: `🔍 ${t('fraud.tab.ip')}` },
+    { key: 'balance', label: `💰 ${t('fraud.tab.balance')}` },
+    { key: 'game_abuse', label: `🎮 ${t('fraud.tab.gameAbuse')}` },
   ]
 
   // mutation 실패가 콘솔에만 남고 운영자에게 안 보이면 "버튼 눌렀는데 상태가 안 바뀐다"
@@ -331,15 +334,14 @@ export default function FraudPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">부정이용 감지</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{t('fraud.title')}</h1>
 
       {actionError && (
         <div className="card border border-red-300 bg-red-50 text-red-700 text-sm flex items-start justify-between gap-3">
           <div>
-            <strong>액션 실패:</strong> {actionError.message ?? '알 수 없는 오류'}
+            <strong>{t('fraud.actionFailed')}</strong> {actionError.message ?? t('common.unknownError')}
             <div className="text-xs text-red-500 mt-1">
-              audit log 에는 시도 자체가 기록되지 않았을 수 있습니다. 권한/네트워크 확인 후 다시
-              시도하세요.
+              {t('fraud.actionFailedHint')}
             </div>
           </div>
           <button
@@ -350,23 +352,23 @@ export default function FraudPage() {
             }}
             className="text-xs text-red-600 hover:text-red-800 shrink-0"
           >
-            닫기
+            {t('common.close')}
           </button>
         </div>
       )}
 
       <div className="flex gap-2 border-b border-gray-200">
-        {tabs.map((t) => (
+        {tabs.map((tabItem) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tabItem.key}
+            onClick={() => setTab(tabItem.key)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === t.key
+              tab === tabItem.key
                 ? 'border-brand text-brand'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -378,18 +380,18 @@ export default function FraudPage() {
             <table className="w-full text-sm min-w-[720px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">닉네임</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('fraud.col.nickname')}</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium w-[280px]">
-                    의심 사유 (자동 탐지)
+                    {t('fraud.col.suspicionReason')}
                   </th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">가입 IP</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">포인트</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium" title="referral_events 와 referral_energy_bonus 에 실제로 지급된 합계. 0이면 추천 시스템으로는 보상이 나가지 않은 안전 케이스.">
-                    추천 실수령
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('fraud.col.signupIp')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('fraud.col.points')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium" title={t('fraud.col.referralPayoutTooltip')}>
+                    {t('fraud.col.referralPayout')}
                   </th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">가입일</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">처리</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('fraud.col.signupDate')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('fraud.col.status')}</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('fraud.col.action')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -417,23 +419,23 @@ export default function FraudPage() {
                     </td>
                     <td className="px-4 py-3 text-right align-top">
                       {u._referralPayout > 0 ? (
-                        <span className="text-red-600 font-semibold" title="추천 시스템으로 실제 지급된 누적 금액. 0이 아니면 의심 플래그 이전에 받았거나 누락된 케이스이므로 검토 필요.">
+                        <span className="text-red-600 font-semibold" title={t('fraud.col.referralPayoutTooltipNonZero')}>
                           {u._referralPayout.toLocaleString()} P
                         </span>
                       ) : (
-                        <span className="text-gray-300 text-xs" title="추천 시스템(피초대/초대/매일 동반)으로는 한 푼도 지급되지 않음. 의심으로 잡혀도 추천 보상 측면에서는 안전.">
+                        <span className="text-gray-300 text-xs" title={t('fraud.col.referralPayoutTooltipZero')}>
                           0 P
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right align-top text-gray-400 text-xs">
-                      {new Date(u.created_at).toLocaleDateString('ko-KR')}
+                      {formatJstDate(u.created_at)}
                     </td>
                     <td className="px-4 py-3 text-right align-top">
                       {u.is_banned ? (
-                        <span className="badge-red">정지</span>
+                        <span className="badge-red">{t('fraud.status.banned')}</span>
                       ) : (
-                        <span className="badge-yellow">의심</span>
+                        <span className="badge-yellow">{t('fraud.status.suspicious')}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right align-top">
@@ -443,7 +445,7 @@ export default function FraudPage() {
                             const label = u.nickname || `ユーザー${u.id.slice(0, 4)}`
                             if (
                               window.confirm(
-                                `「${label}」을(를) 무혐의 처리하시겠습니까?\n의심 플래그를 해제합니다. (audit log 에 기록됨)`,
+                                `${t('fraud.confirm.clearFlagPrefix')}「${label}」${t('fraud.confirm.clearFlagSuffix')}\n${t('fraud.confirm.clearFlagDetail')}`,
                               )
                             ) {
                               toggleFlag.mutate({ id: u.id, val: false })
@@ -452,14 +454,14 @@ export default function FraudPage() {
                           disabled={toggleFlag.isPending}
                           className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-40"
                         >
-                          무혐의
+                          {t('fraud.action.clear')}
                         </button>
                         <button
                           onClick={() => {
                             const label = u.nickname || `ユーザー${u.id.slice(0, 4)}`
                             const msg = u.is_banned
-                              ? `「${label}」의 계정정지를 해제하시겠습니까?\n해제 후 즉시 로그인/포인트 사용이 가능해집니다.`
-                              : `「${label}」을(를) 계정정지하시겠습니까?\n즉시 적용됩니다. (audit log 에 기록됨)`
+                              ? `「${label}」${t('fraud.confirm.unbanSuffix')}\n${t('fraud.confirm.unbanDetail')}`
+                              : `${t('fraud.confirm.banPrefix')}「${label}」${t('fraud.confirm.banSuffix')}\n${t('fraud.confirm.banDetail')}`
                             if (window.confirm(msg)) {
                               toggleBan.mutate({ id: u.id, val: !u.is_banned })
                             }
@@ -467,7 +469,7 @@ export default function FraudPage() {
                           disabled={toggleBan.isPending}
                           className={`text-xs disabled:opacity-40 ${u.is_banned ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}
                         >
-                          {u.is_banned ? '정지해제' : '계정정지'}
+                          {u.is_banned ? t('fraud.action.unban') : t('fraud.action.ban')}
                         </button>
                       </div>
                     </td>
@@ -476,22 +478,22 @@ export default function FraudPage() {
                 {flaggedLoading && (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                      불러오는 중…
+                      {t('common.loading')}
                     </td>
                   </tr>
                 )}
                 {flaggedError && (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-red-600">
-                      의심 유저 목록을 불러오지 못했습니다 (
-                      {flaggedError.message ?? '알 수 없는 오류'}). 권한/네트워크 상태를 확인하세요.
+                      {t('fraud.flaggedFetchFail')} (
+                      {flaggedError.message ?? t('common.unknownError')}). {t('common.checkPermNetwork')}
                     </td>
                   </tr>
                 )}
                 {!flaggedLoading && !flaggedError && (flagged ?? []).length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                      의심 유저 없음 ✅
+                      {t('fraud.flaggedEmpty')} ✅
                     </td>
                   </tr>
                 )}
@@ -499,15 +501,12 @@ export default function FraudPage() {
             </table>
           </div>
           <p className="text-xs text-gray-500 px-1 leading-relaxed">
-            사유는 DB 가입 시 자동 플래그(
+            {t('fraud.footnote.criteriaPrefix')}
             <code className="text-[11px] bg-gray-100 px-1 rounded">_try_flag_abusive_signup</code>
-            )와 동일한 기준으로 계산합니다. 기기·IDFV/지문은 30일·3건 이상, 가입 IP는 24시간·5건
-            이상, 동일 소셜(해시)은 30일·2건 이상일 때 의심으로 분류됩니다.
+            {t('fraud.footnote.criteriaSuffix')}
             <br />
             <span className="text-gray-600">
-              「추천 실수령」은 친구초대 시스템에서 실제로 지급된 누적 보상(피초대 1,000P·초대자
-              1,000P·매일 동반 에너지)의 합계입니다. 의심 플래그가 켜진 뒤에는 모든 추천 보상이
-              자동 차단되므로, 0 P이면 추천 어뷰징 측면에서는 무해한 의심 케이스입니다.
+              {t('fraud.footnote.referralPayout')}
             </span>
           </p>
         </div>
@@ -517,12 +516,12 @@ export default function FraudPage() {
       {tab === 'ip' && (
         <div className="space-y-4">
           {duplicateIPsLoading && (
-            <div className="card text-center text-gray-400 py-8">불러오는 중…</div>
+            <div className="card text-center text-gray-400 py-8">{t('common.loading')}</div>
           )}
           {duplicateIPsError && (
             <div className="card text-center text-red-600 py-8">
-              중복 IP 목록을 불러오지 못했습니다 (
-              {duplicateIPsError.message ?? '알 수 없는 오류'}). 권한/네트워크 상태를 확인하세요.
+              {t('fraud.ipFetchFail')} (
+              {duplicateIPsError.message ?? t('common.unknownError')}). {t('common.checkPermNetwork')}
             </div>
           )}
           {!duplicateIPsLoading &&
@@ -531,13 +530,13 @@ export default function FraudPage() {
               <div key={ip} className="card">
                 <div className="flex items-center gap-3 mb-3 flex-wrap">
                   <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">{ip}</code>
-                  <span className="badge-red">DB 기준 {dbCount ?? '?'}개 계정</span>
+                  <span className="badge-red">{t('fraud.ip.dbBased')} {dbCount ?? '?'}{t('fraud.ip.accountsUnit')}</span>
                   {dbCount != null && users.length !== dbCount && (
                     <span
                       className="text-xs text-gray-500"
-                      title="목록은 최대 500건까지만 표시합니다 (IP 그룹 단위 정렬). DB 실측 카운트와 다를 수 있습니다."
+                      title={t('fraud.ip.limitNoteTooltip')}
                     >
-                      표시 {users.length}건
+                      {t('fraud.ip.displayedPrefix')} {users.length}{t('fraud.ip.casesUnit')}
                     </span>
                   )}
                 </div>
@@ -552,10 +551,10 @@ export default function FraudPage() {
                       </Link>
                       <div className="flex items-center gap-2">
                         <span className="text-gray-400 text-xs">
-                          {new Date(u.created_at).toLocaleDateString('ko-KR')}
+                          {formatJstDate(u.created_at)}
                         </span>
-                        {u.is_banned && <span className="badge-red text-xs">정지</span>}
-                        {u.is_flagged && <span className="badge-yellow text-xs">의심</span>}
+                        {u.is_banned && <span className="badge-red text-xs">{t('fraud.status.banned')}</span>}
+                        {u.is_flagged && <span className="badge-yellow text-xs">{t('fraud.status.suspicious')}</span>}
                       </div>
                     </div>
                   ))}
@@ -563,7 +562,7 @@ export default function FraudPage() {
               </div>
             ))}
           {!duplicateIPsLoading && !duplicateIPsError && (duplicateIPs ?? []).length === 0 && (
-            <div className="card text-center text-gray-400 py-8">중복 IP 탐지 없음 ✅</div>
+            <div className="card text-center text-gray-400 py-8">{t('fraud.ipEmpty')} ✅</div>
           )}
         </div>
       )}
@@ -577,34 +576,34 @@ export default function FraudPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">순위</th>
-                <th className="text-left px-4 py-3 text-gray-500 font-medium">닉네임</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">포인트</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">자체 획득</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">에너지</th>
-                <th className="text-right px-4 py-3 text-gray-500 font-medium">상태</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('fraud.balance.rank')}</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-medium">{t('fraud.col.nickname')}</th>
+                <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('fraud.col.points')}</th>
+                <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('fraud.balance.selfEarned')}</th>
+                <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('fraud.balance.energy')}</th>
+                <th className="text-right px-4 py-3 text-gray-500 font-medium">{t('fraud.col.status')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {highBalanceLoading && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                    불러오는 중…
+                    {t('common.loading')}
                   </td>
                 </tr>
               )}
               {highBalanceError && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-red-600">
-                    고액 보유자 목록을 불러오지 못했습니다 (
-                    {highBalanceError.message ?? '알 수 없는 오류'}).
+                    {t('fraud.balanceFetchFail')} (
+                    {highBalanceError.message ?? t('common.unknownError')}).
                   </td>
                 </tr>
               )}
               {!highBalanceLoading && !highBalanceError && (highBalance ?? []).length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                    대상 없음
+                    {t('common.noTargets')}
                   </td>
                 </tr>
               )}
@@ -630,9 +629,9 @@ export default function FraudPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {u.is_flagged ? (
-                      <span className="badge-yellow">의심</span>
+                      <span className="badge-yellow">{t('fraud.status.suspicious')}</span>
                     ) : (
-                      <span className="badge-green">정상</span>
+                      <span className="badge-green">{t('fraud.status.normal')}</span>
                     )}
                   </td>
                 </tr>

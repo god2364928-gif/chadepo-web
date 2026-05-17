@@ -1,15 +1,18 @@
+import { useLanguage } from '../../contexts/LanguageContext'
+
 const FORMATS = [
-  { id: '', label: '전체' },
-  { id: 'banner', label: 'Banner' },
-  { id: 'mrec', label: 'MREC' },
-  { id: 'interstitial', label: 'Interstitial' },
-  { id: 'rewarded', label: 'Rewarded' },
+  { id: '', labelKey: 'ads.format.all' },
+  { id: 'banner', labelKey: null, label: 'Banner' },
+  { id: 'mrec', labelKey: null, label: 'MREC' },
+  { id: 'interstitial', labelKey: null, label: 'Interstitial' },
+  { id: 'rewarded', labelKey: null, label: 'Rewarded' },
 ]
 
 export default function AdFormatFilter({ value, onChange, disabled = false }) {
+  const { t } = useLanguage()
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500">광고 포맷</span>
+      <span className="text-xs text-gray-500">{t('ads.format.label')}</span>
       <select
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value || null)}
@@ -18,7 +21,7 @@ export default function AdFormatFilter({ value, onChange, disabled = false }) {
       >
         {FORMATS.map((f) => (
           <option key={f.id || 'all'} value={f.id}>
-            {f.label}
+            {f.labelKey ? t(f.labelKey) : f.label}
           </option>
         ))}
       </select>

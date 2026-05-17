@@ -1,21 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { supabase } from '../../lib/supabase'
 import { formatInt, formatUsd, formatPct } from '../../utils/jstFormat'
 
-const COLUMNS = [
-  { id: 'screen_context', label: '화면', align: 'left', type: 'string' },
-  { id: 'ad_format', label: '포맷', align: 'left', type: 'string' },
-  { id: 'impressions', label: '노출', align: 'right', type: 'number' },
-  { id: 'clicks', label: '클릭', align: 'right', type: 'number' },
-  { id: 'revenue_usd', label: '수익', align: 'right', type: 'number' },
-  { id: 'ecpm', label: 'eCPM', align: 'right', type: 'number' },
-  { id: 'ctr', label: 'CTR', align: 'right', type: 'number' },
-]
-
 export default function AdScreenPerformanceTable({ period, adFormat, refreshKey }) {
+  const { t } = useLanguage()
   const [sortBy, setSortBy] = useState('revenue_usd')
   const [sortDir, setSortDir] = useState('desc')
+
+  const COLUMNS = [
+    { id: 'screen_context', label: t('ads.screen.col.screen'), align: 'left', type: 'string' },
+    { id: 'ad_format', label: t('ads.screen.col.format'), align: 'left', type: 'string' },
+    { id: 'impressions', label: t('ads.screen.col.impressions'), align: 'right', type: 'number' },
+    { id: 'clicks', label: t('ads.screen.col.clicks'), align: 'right', type: 'number' },
+    { id: 'revenue_usd', label: t('ads.screen.col.revenue'), align: 'right', type: 'number' },
+    { id: 'ecpm', label: 'eCPM', align: 'right', type: 'number' },
+    { id: 'ctr', label: 'CTR', align: 'right', type: 'number' },
+  ]
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['ad_screen_performance', period, adFormat, refreshKey],
@@ -47,6 +49,7 @@ export default function AdScreenPerformanceTable({ period, adFormat, refreshKey 
       return sortDir === 'asc' ? cmp : -cmp
     })
     return sorted
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, sortBy, sortDir])
 
   function toggleSort(col) {
@@ -66,20 +69,20 @@ export default function AdScreenPerformanceTable({ period, adFormat, refreshKey 
   return (
     <div className="card p-0 overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200">
-        <h2 className="font-semibold text-gray-900 text-sm">화면별 성과</h2>
+        <h2 className="font-semibold text-gray-900 text-sm">{t('ads.screen.title')}</h2>
       </div>
       {error ? (
         <div className="px-4 py-6 text-center">
-          <p className="text-red-700 text-sm mb-2">불러오기 실패: {error.message}</p>
+          <p className="text-red-700 text-sm mb-2">{t('common.loadFailed')}: {error.message}</p>
           <button
             onClick={() => refetch()}
             className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
           >
-            다시 시도
+            {t('common.retry')}
           </button>
         </div>
       ) : isLoading ? (
-        <div className="py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+        <div className="py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -121,7 +124,7 @@ export default function AdScreenPerformanceTable({ period, adFormat, refreshKey 
                     colSpan={COLUMNS.length}
                     className="px-4 py-8 text-center text-gray-400 text-xs"
                   >
-                    데이터가 없습니다
+                    {t('common.noData')}
                   </td>
                 </tr>
               )}

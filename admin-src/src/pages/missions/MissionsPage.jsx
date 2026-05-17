@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import GameTimeStats from './GameTimeStats'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { formatJstTimeHm } from '../../utils/jstFormat'
 
 // ── 6개 퀘스트 정의 (앱 코드 기준) ──
 const QUESTS = [
@@ -9,18 +11,18 @@ const QUESTS = [
   {
     key: 'play_game',
     icon: '🎮',
-    title: 'ゲームを1回プレイ',
-    desc: 'ゲームタブのゲームを1回プレイ',
+    title: 'ゲームを2回プレイ',
+    desc: 'ゲームタブのゲームを2回プレイ',
   },
   {
     key: 'energy_20',
     icon: '⚡',
-    title: 'エネルギーを20回',
+    title: 'エネルギーを20回受け取る',
     desc: 'ホーム画面でエネルギーを20回タップ',
   },
-  { key: 'feed_20', icon: '🍚', title: 'ごはんを20回', desc: '万歩計でキャラにごはんを20回あげる' },
-  { key: 'raffle_20', icon: '🎰', title: 'くじを20回', desc: 'くじ・抽選を合計20回行う' },
-  { key: 'sanpo', icon: '🐾', title: 'お散歩で2マス進む', desc: '散歩道を2マス進む (≒2,000歩 以上)' },
+  { key: 'feed_20', icon: '🍚', title: 'ごはんを20回あげる', desc: '万歩計でキャラにごはんを20回あげる' },
+  { key: 'raffle_20', icon: '🎰', title: 'くじを20回引く', desc: 'くじ・抽選を合計20回行う' },
+  { key: 'sanpo', icon: '🐾', title: 'お散歩で2マス進む', desc: '1日に2,000歩以上歩く（2マス分）' },
 ]
 
 const GAME_TYPE_LABELS = {
@@ -78,9 +80,9 @@ function jstToday() {
   return d.toISOString().slice(0, 10)
 }
 
+// プレイ時刻は JST (運用 OS の TZ に依存しない).
 function timeStr(ts) {
-  if (!ts) return '—'
-  return new Date(ts).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+  return ts ? formatJstTimeHm(ts) : '—'
 }
 
 function nickOf(userId, nickname) {
@@ -88,7 +90,7 @@ function nickOf(userId, nickname) {
 }
 
 // 날짜 선택기 컴포넌트
-function DatePicker({ value, onChange }) {
+function DatePicker({ value, onChange, todayLabel }) {
   return (
     <div className="flex items-center gap-2">
       <button
@@ -122,13 +124,14 @@ function DatePicker({ value, onChange }) {
         onClick={() => onChange(jstToday())}
         className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs text-gray-600 font-medium"
       >
-        오늘
+        {todayLabel}
       </button>
     </div>
   )
 }
 
 export default function MissionsPage() {
+  const { t } = useLanguage()
   const [tab, setTab] = useState('quest')
   const [date, setDate] = useState(jstToday)
 
@@ -194,43 +197,11 @@ export default function MissionsPage() {
     keepPreviousData: true,
   })
 
-  // ── 박스 집계 (RPC) ──
-  const { data: boxStats, isLoading: boxLoading } = useQuery({
-    queryKey: ['box-stats', date],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('admin_get_box_stats', { p_date: date })
-      if (error) throw error
-      return data?.[0] ?? null
-    },
-    enabled: tab === 'box',
-  })
-
-  // 박스 최근 로그 (50건씩)
-  const [boxPage, setBoxPage] = useState(0)
-  const { data: boxLog } = useQuery({
-    queryKey: ['box-log', date, boxPage],
-    queryFn: async () => {
-      const { data, count, error } = await supabase
-        .from('quest_box_opens')
-        .select('user_id, points_awarded, created_at, profiles!user_id(nickname)', {
-          count: 'exact',
-        })
-        .eq('open_date', date)
-        .order('created_at', { ascending: false })
-        .range(boxPage * LOG_SIZE, (boxPage + 1) * LOG_SIZE - 1)
-      if (error) throw error
-      return { rows: data ?? [], total: count ?? 0 }
-    },
-    enabled: tab === 'box',
-    keepPreviousData: true,
-  })
-
   // 날짜 바꾸면 페이지 초기화
   const handleDate = (d) => {
     setDate(d)
     setQuestPage(0)
     setGamePage(0)
-    setBoxPage(0)
   }
 
   // 게임 합계
@@ -247,14 +218,14 @@ export default function MissionsPage() {
     if (total <= LOG_SIZE) return null
     return (
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        <span className="text-xs text-gray-400">총 {total.toLocaleString()}건</span>
+        <span className="text-xs text-gray-400">{t('common.totalPrefix')} {total.toLocaleString()}{t('common.casesUnit')}</span>
         <div className="flex items-center gap-2">
           <button
             disabled={page === 0}
             onClick={() => setPage((p) => p - 1)}
             className="px-3 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
           >
-            이전
+            {t('common.prev')}
           </button>
           <span className="text-xs text-gray-500">
             {page + 1} / {maxPage + 1}
@@ -264,7 +235,7 @@ export default function MissionsPage() {
             onClick={() => setPage((p) => p + 1)}
             className="px-3 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
           >
-            다음
+            {t('common.next')}
           </button>
         </div>
       </div>
@@ -272,22 +243,21 @@ export default function MissionsPage() {
   }
 
   const TABS = [
-    { id: 'quest', label: '오늘 퀘스트' },
-    { id: 'game', label: '오늘 게임' },
-    { id: 'box', label: '퀘스트 박스' },
-    { id: 'time', label: '⏱️ 게임 완료시간 통계' },
+    { id: 'quest', label: t('missions.tab.quest') },
+    { id: 'game', label: t('missions.tab.game') },
+    { id: 'time', label: `⏱️ ${t('missions.tab.time')}` },
   ]
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">게임·미션 관리</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('missions.title')}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            앱 &quot;あそぶ&quot; 기준 — 퀘스트 6종 / 게임 15종 / 퀘스트 박스
+            {t('missions.subtitle')}
           </p>
         </div>
-        {tab !== 'time' && <DatePicker value={date} onChange={handleDate} />}
+        {tab !== 'time' && <DatePicker value={date} onChange={handleDate} todayLabel={t('common.today')} />}
       </div>
 
       {/* 탭 */}
@@ -311,25 +281,25 @@ export default function MissionsPage() {
       {tab === 'quest' && (
         <div className="space-y-6">
           {questLoading ? (
-            <div className="py-12 text-center text-gray-400">불러오는 중...</div>
+            <div className="py-12 text-center text-gray-400">{t('common.loading')}</div>
           ) : (
             <>
               {/* 요약 */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="card text-center">
-                  <p className="text-sm text-gray-500 mb-1">총 퀘스트 완료</p>
+                  <p className="text-sm text-gray-500 mb-1">{t('missions.quest.totalCompleted')}</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {totalQuestCompleted.toLocaleString()}건
+                    {totalQuestCompleted.toLocaleString()}{t('common.casesUnit')}
                   </p>
                 </div>
                 <div className="card text-center">
-                  <p className="text-sm text-gray-500 mb-1">완료한 유저 수</p>
+                  <p className="text-sm text-gray-500 mb-1">{t('missions.quest.uniqueUsers')}</p>
                   <p className="text-3xl font-bold text-brand">
                     {Math.max(
                       ...(questStats ?? []).map((r) => Number(r.unique_users)),
                       0
                     ).toLocaleString()}
-                    명+
+                    {t('common.peopleUnitPlus')}
                   </p>
                 </div>
               </div>
@@ -354,7 +324,7 @@ export default function MissionsPage() {
                           >
                             {cnt.toLocaleString()}
                           </p>
-                          {uniq > 0 && <p className="text-xs text-gray-400">{uniq}명</p>}
+                          {uniq > 0 && <p className="text-xs text-gray-400">{uniq}{t('common.peopleUnit')}</p>}
                         </div>
                       </div>
                     </div>
@@ -365,10 +335,10 @@ export default function MissionsPage() {
               {/* 최근 로그 */}
               <div className="card">
                 <h2 className="font-semibold text-gray-900 mb-3">
-                  퀘스트 완료 로그
+                  {t('missions.quest.completionLog')}
                   {questLog?.total > 0 && (
                     <span className="ml-2 text-sm text-gray-400 font-normal">
-                      총 {questLog.total.toLocaleString()}건
+                      {t('common.totalPrefix')} {questLog.total.toLocaleString()}{t('common.casesUnit')}
                     </span>
                   )}
                 </h2>
@@ -376,9 +346,9 @@ export default function MissionsPage() {
                   <table className="w-full text-sm">
                     <thead className="border-b border-gray-100">
                       <tr className="text-xs text-gray-500">
-                        <th className="text-left pb-2">유저</th>
-                        <th className="text-left pb-2">퀘스트</th>
-                        <th className="text-right pb-2">시각</th>
+                        <th className="text-left pb-2">{t('missions.col.user')}</th>
+                        <th className="text-left pb-2">{t('missions.col.quest')}</th>
+                        <th className="text-right pb-2">{t('missions.col.time')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -401,7 +371,7 @@ export default function MissionsPage() {
                       {(questLog?.rows ?? []).length === 0 && (
                         <tr>
                           <td colSpan={3} className="py-6 text-center text-gray-400 text-xs">
-                            기록 없음
+                            {t('common.noRecord')}
                           </td>
                         </tr>
                       )}
@@ -419,24 +389,24 @@ export default function MissionsPage() {
       {tab === 'game' && (
         <div className="space-y-6">
           {gameLoading ? (
-            <div className="py-12 text-center text-gray-400">불러오는 중...</div>
+            <div className="py-12 text-center text-gray-400">{t('common.loading')}</div>
           ) : (
             <>
               <div className="grid grid-cols-3 gap-4">
                 <div className="card text-center">
-                  <p className="text-sm text-gray-500 mb-1">총 플레이</p>
+                  <p className="text-sm text-gray-500 mb-1">{t('missions.game.totalPlays')}</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {totalGamePlays.toLocaleString()}건
+                    {totalGamePlays.toLocaleString()}{t('common.casesUnit')}
                   </p>
                 </div>
                 <div className="card text-center">
-                  <p className="text-sm text-gray-500 mb-1">지급 포인트</p>
+                  <p className="text-sm text-gray-500 mb-1">{t('missions.game.totalPoints')}</p>
                   <p className="text-3xl font-bold text-brand">
                     {totalGamePoints.toLocaleString()} P
                   </p>
                 </div>
                 <div className="card text-center">
-                  <p className="text-sm text-gray-500 mb-1">추천 보너스</p>
+                  <p className="text-sm text-gray-500 mb-1">{t('missions.game.recommendedBonus')}</p>
                   <p className="text-3xl font-bold text-orange-500">
                     +{totalGameBonus.toLocaleString()} P
                   </p>
@@ -449,11 +419,10 @@ export default function MissionsPage() {
                   <span className="text-base">🔥</span>
                   <div className="text-xs text-gray-700 leading-relaxed">
                     <span className="font-semibold text-orange-700">
-                      おすすめゲーム 정책 (2026-05-14~)
+                      {t('missions.game.policyTitle')}
                     </span>
                     <span className="ml-2 text-gray-500">
-                      매일 <b>かんたん(short) 6종 중 1종</b>만 おすすめ로 선정 (이전: 全 tier 10종 중 2종).
-                      下表에서 🔥 배지가 추천 풀, 추천 보너스(+)는 그날 선정된 1종에서만 발생.
+                      {t('missions.game.policyDetail')}
                     </span>
                   </div>
                 </div>
@@ -465,22 +434,22 @@ export default function MissionsPage() {
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">
-                        게임
+                        {t('missions.game.col.game')}
                       </th>
                       <th className="text-right px-4 py-3 text-xs text-gray-500 font-medium">
-                        플레이
+                        {t('missions.game.col.plays')}
                       </th>
                       <th className="text-right px-4 py-3 text-xs text-gray-500 font-medium">
-                        유저
+                        {t('missions.game.col.users')}
                       </th>
                       <th className="text-right px-4 py-3 text-xs text-gray-500 font-medium">
-                        포인트
+                        {t('missions.game.col.points')}
                       </th>
                       <th className="text-right px-4 py-3 text-xs text-gray-500 font-medium">
-                        보너스
+                        {t('missions.game.col.bonus')}
                       </th>
                       <th className="text-right px-4 py-3 text-xs text-gray-500 font-medium">
-                        에너지 소비
+                        {t('missions.game.col.energyUsed')}
                       </th>
                     </tr>
                   </thead>
@@ -506,9 +475,9 @@ export default function MissionsPage() {
                               {inPool && (
                                 <span
                                   className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 bg-orange-100 text-orange-700"
-                                  title="おすすめゲーム 풀 (short tier 6종)"
+                                  title={t('missions.game.recommendedPoolTooltip')}
                                 >
-                                  🔥 추천 풀
+                                  🔥 {t('missions.game.recommendedPool')}
                                 </span>
                               )}
                               <span className="text-xs text-gray-700">
@@ -533,7 +502,7 @@ export default function MissionsPage() {
                                 }
                                 title={
                                   isLegacyBonus
-                                    ? '구 정책 잔재 (2026-05-14 이전): 현재는 추천 풀이 아님'
+                                    ? t('missions.game.legacyBonusTooltip')
                                     : undefined
                                 }
                               >
@@ -555,7 +524,7 @@ export default function MissionsPage() {
                     {(gameStats ?? []).length === 0 && (
                       <tr>
                         <td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">
-                          기록 없음
+                          {t('common.noRecord')}
                         </td>
                       </tr>
                     )}
@@ -566,10 +535,10 @@ export default function MissionsPage() {
               {/* 최근 플레이 로그 */}
               <div className="card">
                 <h2 className="font-semibold text-gray-900 mb-3">
-                  최근 플레이 로그
+                  {t('missions.game.recentLog')}
                   {gameLog?.total > 0 && (
                     <span className="ml-2 text-sm text-gray-400 font-normal">
-                      총 {gameLog.total.toLocaleString()}건
+                      {t('common.totalPrefix')} {gameLog.total.toLocaleString()}{t('common.casesUnit')}
                     </span>
                   )}
                 </h2>
@@ -577,11 +546,11 @@ export default function MissionsPage() {
                   <table className="w-full text-sm">
                     <thead className="border-b border-gray-100">
                       <tr className="text-xs text-gray-500">
-                        <th className="text-left pb-2">유저</th>
-                        <th className="text-left pb-2">게임</th>
-                        <th className="text-right pb-2">에너지</th>
-                        <th className="text-right pb-2">포인트</th>
-                        <th className="text-right pb-2">시각</th>
+                        <th className="text-left pb-2">{t('missions.col.user')}</th>
+                        <th className="text-left pb-2">{t('missions.game.col.game')}</th>
+                        <th className="text-right pb-2">{t('missions.game.col.energy')}</th>
+                        <th className="text-right pb-2">{t('missions.game.col.points')}</th>
+                        <th className="text-right pb-2">{t('missions.col.time')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -610,7 +579,7 @@ export default function MissionsPage() {
                       {(gameLog?.rows ?? []).length === 0 && (
                         <tr>
                           <td colSpan={5} className="py-6 text-center text-gray-400 text-xs">
-                            기록 없음
+                            {t('common.noRecord')}
                           </td>
                         </tr>
                       )}
@@ -618,105 +587,6 @@ export default function MissionsPage() {
                   </table>
                 </div>
                 <Pager page={gamePage} setPage={setGamePage} total={gameLog?.total ?? 0} />
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── 퀘스트 박스 탭 ── */}
-      {tab === 'box' && (
-        <div className="space-y-6">
-          {boxLoading ? (
-            <div className="py-12 text-center text-gray-400">불러오는 중...</div>
-          ) : (
-            <>
-              <div className="grid grid-cols-4 gap-4">
-                {[
-                  {
-                    label: '박스 개봉',
-                    value: Number(boxStats?.open_count ?? 0).toLocaleString() + '개',
-                    cls: 'text-gray-900',
-                  },
-                  {
-                    label: '개봉 유저',
-                    value: Number(boxStats?.unique_users ?? 0).toLocaleString() + '명',
-                    cls: 'text-brand',
-                  },
-                  {
-                    label: '총 지급 P',
-                    value: Number(boxStats?.total_points ?? 0).toLocaleString() + ' P',
-                    cls: 'text-green-600',
-                  },
-                  {
-                    label: '평균 P',
-                    value: Number(boxStats?.avg_points ?? 0) + ' P',
-                    cls: 'text-gray-700',
-                  },
-                ].map(({ label, value, cls }) => (
-                  <div key={label} className="card text-center">
-                    <p className="text-sm text-gray-500 mb-1">{label}</p>
-                    <p className={`text-2xl font-bold ${cls}`}>{value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="card">
-                <h2 className="font-semibold text-gray-900 mb-3">
-                  박스 개봉 로그
-                  {boxLog?.total > 0 && (
-                    <span className="ml-2 text-sm text-gray-400 font-normal">
-                      총 {boxLog.total.toLocaleString()}건
-                    </span>
-                  )}
-                </h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="border-b border-gray-100">
-                      <tr className="text-xs text-gray-500">
-                        <th className="text-left pb-2">유저</th>
-                        <th className="text-right pb-2">획득 P</th>
-                        <th className="text-right pb-2">등급</th>
-                        <th className="text-right pb-2">시각</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {(boxLog?.rows ?? []).map((b, i) => {
-                        const pts = b.points_awarded ?? 0
-                        const grade =
-                          pts >= 7
-                            ? { label: '✨ 大当たり', cls: 'text-orange-500' }
-                            : pts >= 4
-                              ? { label: '🌟 当たり', cls: 'text-indigo-500' }
-                              : { label: '🎉 ゲット', cls: 'text-green-600' }
-                        return (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="py-1.5 text-xs text-gray-700">
-                              {nickOf(b.user_id, b.profiles?.nickname)}
-                            </td>
-                            <td className="py-1.5 text-right font-bold text-brand text-sm">
-                              +{pts} P
-                            </td>
-                            <td className={`py-1.5 text-right text-xs font-medium ${grade.cls}`}>
-                              {grade.label}
-                            </td>
-                            <td className="py-1.5 text-right text-xs text-gray-400">
-                              {timeStr(b.created_at)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                      {(boxLog?.rows ?? []).length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="py-6 text-center text-gray-400 text-xs">
-                            기록 없음
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                <Pager page={boxPage} setPage={setBoxPage} total={boxLog?.total ?? 0} />
               </div>
             </>
           )}

@@ -1,20 +1,22 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { supabase } from '../../lib/supabase'
 import { formatInt, formatUsd } from '../../utils/jstFormat'
 
-const COLUMNS = [
-  { id: 'rank', label: '#', align: 'right', type: 'number' },
-  { id: 'nickname', label: '닉네임', align: 'left', type: 'string' },
-  { id: 'total_impressions', label: '노출', align: 'right', type: 'number' },
-  { id: 'total_rewarded', label: '리워드', align: 'right', type: 'number' },
-  { id: 'total_revenue_usd', label: '수익', align: 'right', type: 'number' },
-]
-
 export default function AdHeavyUsersTable({ refreshKey }) {
+  const { t } = useLanguage()
   const [sortBy, setSortBy] = useState('rank')
   const [sortDir, setSortDir] = useState('asc')
+
+  const COLUMNS = [
+    { id: 'rank', label: '#', align: 'right', type: 'number' },
+    { id: 'nickname', label: t('ads.heavy.col.nickname'), align: 'left', type: 'string' },
+    { id: 'total_impressions', label: t('ads.heavy.col.impressions'), align: 'right', type: 'number' },
+    { id: 'total_rewarded', label: t('ads.heavy.col.rewarded'), align: 'right', type: 'number' },
+    { id: 'total_revenue_usd', label: t('ads.heavy.col.revenue'), align: 'right', type: 'number' },
+  ]
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['ad_heavy_users', 100, refreshKey],
@@ -45,6 +47,7 @@ export default function AdHeavyUsersTable({ refreshKey }) {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return sorted
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, sortBy, sortDir])
 
   function toggleSort(col) {
@@ -66,21 +69,21 @@ export default function AdHeavyUsersTable({ refreshKey }) {
   return (
     <div className="card p-0 overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-        <h2 className="font-semibold text-gray-900 text-sm">헤비 유저 Top 100</h2>
-        <span className="text-xs text-gray-400">최근 30일 (JST) · 매일 03:30 갱신</span>
+        <h2 className="font-semibold text-gray-900 text-sm">{t('ads.heavy.title')}</h2>
+        <span className="text-xs text-gray-400">{t('ads.heavy.subtitle')}</span>
       </div>
       {error ? (
         <div className="px-4 py-6 text-center">
-          <p className="text-red-700 text-sm mb-2">불러오기 실패: {error.message}</p>
+          <p className="text-red-700 text-sm mb-2">{t('common.loadFailed')}: {error.message}</p>
           <button
             onClick={() => refetch()}
             className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
           >
-            다시 시도
+            {t('common.retry')}
           </button>
         </div>
       ) : isLoading ? (
-        <div className="py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+        <div className="py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -125,7 +128,7 @@ export default function AdHeavyUsersTable({ refreshKey }) {
                     colSpan={COLUMNS.length}
                     className="px-4 py-8 text-center text-gray-400 text-xs"
                   >
-                    데이터가 없습니다
+                    {t('common.noData')}
                   </td>
                 </tr>
               )}

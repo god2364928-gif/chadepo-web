@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { supabase } from '../../lib/supabase'
 import { formatInt, formatPct } from '../../utils/jstFormat'
 
@@ -36,6 +37,7 @@ function displayRateColor(rate) {
 const FORMAT_ORDER = ['rewarded', 'interstitial', 'mrec', 'banner']
 
 export default function AdLoadHealthTable({ period, refreshKey }) {
+  const { t } = useLanguage()
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['ad_load_health', period, refreshKey],
     queryFn: async () => {
@@ -58,45 +60,45 @@ export default function AdLoadHealthTable({ period, refreshKey }) {
   return (
     <div className="card p-0 overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200">
-        <h2 className="font-semibold text-gray-900 text-sm">SDK 건강도</h2>
+        <h2 className="font-semibold text-gray-900 text-sm">{t('ads.load.title')}</h2>
       </div>
       {error ? (
         <div className="px-4 py-6 text-center">
-          <p className="text-red-700 text-sm mb-2">불러오기 실패: {error.message}</p>
+          <p className="text-red-700 text-sm mb-2">{t('common.loadFailed')}: {error.message}</p>
           <button
             onClick={() => refetch()}
             className="text-xs px-3 py-1 bg-white border border-red-300 text-red-700 rounded hover:bg-red-50"
           >
-            다시 시도
+            {t('common.retry')}
           </button>
         </div>
       ) : isLoading ? (
-        <div className="py-12 text-center text-gray-400 text-sm">불러오는 중...</div>
+        <div className="py-12 text-center text-gray-400 text-sm">{t('common.loading')}</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
               <tr>
-                <th className="text-left  px-4 py-3 font-medium">포맷</th>
-                <th className="text-right px-4 py-3 font-medium">요청</th>
-                <th className="text-right px-4 py-3 font-medium">로드</th>
-                <th className="text-right px-4 py-3 font-medium">실패</th>
-                <th className="text-right px-4 py-3 font-medium">표시</th>
+                <th className="text-left  px-4 py-3 font-medium">{t('ads.load.col.format')}</th>
+                <th className="text-right px-4 py-3 font-medium">{t('ads.load.col.requested')}</th>
+                <th className="text-right px-4 py-3 font-medium">{t('ads.load.col.loaded')}</th>
+                <th className="text-right px-4 py-3 font-medium">{t('ads.load.col.failed')}</th>
+                <th className="text-right px-4 py-3 font-medium">{t('ads.load.col.displayed')}</th>
                 <th
                   className="text-right px-4 py-3 font-medium"
-                  title="요청 대비 로드 성공률. Banner/MREC 는 auto-refresh 로 100% 초과 가능."
+                  title={t('ads.load.tooltip.fillRate')}
                 >
                   fill_rate <span className="text-gray-300">ⓘ</span>
                 </th>
                 <th
                   className="text-right px-4 py-3 font-medium"
-                  title="로드 요청 중 성공 비율. 95% 미만은 광고 SDK 또는 재고 문제."
+                  title={t('ads.load.tooltip.successRate')}
                 >
                   success_rate <span className="text-gray-300">ⓘ</span>
                 </th>
                 <th
                   className="text-right px-4 py-3 font-medium"
-                  title="로드된 광고가 실제 표시된 비율. 80% 미만은 UX/타이밍 문제."
+                  title={t('ads.load.tooltip.displayRate')}
                 >
                   display_rate <span className="text-gray-300">ⓘ</span>
                 </th>
@@ -134,15 +136,14 @@ export default function AdLoadHealthTable({ period, refreshKey }) {
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-gray-400 text-xs">
-                    데이터가 없습니다
+                    {t('common.noData')}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
           <div className="px-4 py-2.5 border-t border-gray-100 text-[11px] text-gray-400 bg-gray-50">
-            ※ Banner / MREC 는 auto-refresh (30~60초) 특성상 1 요청에서 다수 로드 이벤트가
-            발생합니다. fill_rate 100% 초과는 정상.
+            {t('ads.load.footnote')}
           </div>
         </div>
       )}
