@@ -275,6 +275,151 @@ function ReasonModal({ modal, userId, onClose }) {
   )
 }
 
+// 전체 리셋 모달 — admin_reset_user_full RPC 를 호출해 유저를 "신규 가입 직후"
+// 상태로 되돌린다. 온보딩 4테이블 DELETE + segment='new' + points/energy=0.
+// 위험 작업이라 사유 필수 + 닉네임 재입력 확인 + 결과 카운트 표시.
+function ResetModal({ user, onClose }) {
+  const { t } = useLanguage()
+  const qc = useQueryClient()
+  const [reason, setReason] = useState('')
+  const [nicknameConfirm, setNicknameConfirm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [result, setResult] = useState(null)
+
+  const nickname = user?.nickname ?? ''
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!reason.trim()) {
+      setMsg(t('users.detail.adjust.reasonRequired'))
+      return
+    }
+    if (nicknameConfirm !== nickname) {
+      setMsg(t('users.detail.resetModal.nicknameMismatch'))
+      return
+    }
+    setLoading(true)
+    setMsg('')
+    try {
+      const { data, error } = await supabase.rpc('admin_reset_user_full', {
+        p_user_id: user.id,
+        p_reason: reason,
+      })
+      if (error) {
+        setMsg(`${t('common.errorPrefix')}${error.message}`)
+        return
+      }
+      // RPC 가 table 을 반환하므로 첫 row 만 사용
+      setResult(Array.isArray(data) ? data[0] : data)
+      // 상세 + 이력 탭 + 리스트 캐시 무효화
+      qc.invalidateQueries({ queryKey: ['user', user.id] })
+      qc.invalidateQueries({ queryKey: ['point-logs', user.id] })
+      qc.invalidateQueries({ queryKey: ['energy-logs', user.id] })
+      qc.invalidateQueries({ queryKey: ['users'] })
+    } catch (e) {
+      setMsg(`${t('common.errorPrefix')}${e?.message ?? String(e)}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-md shadow-xl">
+        <div className="px-6 py-4 border-b border-gray-100 bg-red-50">
+          <h3 className="font-semibold text-red-700">{t('users.detail.resetModal.title')}</h3>
+          <p className="text-xs text-red-600 mt-1">{t('users.detail.resetModal.desc')}</p>
+        </div>
+        {result ? (
+          <div className="p-6 space-y-4">
+            <p className="text-sm font-medium text-green-700">
+              {t('users.detail.resetModal.success')}
+            </p>
+            <dl className="text-xs space-y-1 bg-gray-50 rounded-lg p-3">
+              <div className="flex justify-between">
+                <dt className="text-gray-500">{t('users.detail.resetModal.pointsBefore')}</dt>
+                <dd className="font-medium">{result.points_before?.toLocaleString() ?? 0} P</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">{t('users.detail.resetModal.energyBefore')}</dt>
+                <dd className="font-medium">{result.energy_before?.toLocaleString() ?? 0} E</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">{t('users.detail.resetModal.welcomeDeleted')}</dt>
+                <dd className="font-medium">{result.welcome_rows_deleted ?? 0}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">{t('users.detail.resetModal.boosterDeleted')}</dt>
+                <dd className="font-medium">
+                  {result.booster_state_deleted ?? 0} / log {result.booster_log_deleted ?? 0}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">{t('users.detail.resetModal.referralDeleted')}</dt>
+                <dd className="font-medium">{result.referral_deleted ?? 0}</dd>
+              </div>
+            </dl>
+            <div className="flex justify-end">
+              <button type="button" onClick={onClose} className="btn-primary">
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <ul className="text-xs text-gray-600 list-disc pl-5 space-y-0.5">
+              <li>{t('users.detail.resetModal.bullet1')}</li>
+              <li>{t('users.detail.resetModal.bullet2')}</li>
+              <li>{t('users.detail.resetModal.bullet3')}</li>
+              <li>{t('users.detail.resetModal.bullet4')}</li>
+            </ul>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('users.detail.adjust.reasonLabel')}
+              </label>
+              <textarea
+                className="input h-20 resize-none"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder={t('users.detail.resetModal.reasonPlaceholder')}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('users.detail.resetModal.nicknameConfirmLabel')}
+                <span className="ml-1 font-mono text-red-600">{nickname || '—'}</span>
+              </label>
+              <input
+                type="text"
+                className="input"
+                value={nicknameConfirm}
+                onChange={(e) => setNicknameConfirm(e.target.value)}
+                placeholder={nickname}
+                required
+              />
+            </div>
+            {msg && <p className="text-red-600 text-sm">{msg}</p>}
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={onClose} className="btn-secondary" disabled={loading}>
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                disabled={loading}
+              >
+                {loading ? t('common.processing') : t('users.detail.resetModal.confirm')}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function UserDetail() {
   const { t } = useLanguage()
   const { id } = useParams()
@@ -282,6 +427,7 @@ export default function UserDetail() {
   const [modal, setModal] = useState(null)
   // 의심/정지 토글용 사유 입력 모달 상태. { kind: 'flag'|'ban', nextValue: boolean }
   const [reasonModal, setReasonModal] = useState(null)
+  const [resetModalOpen, setResetModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('points')
 
   const { data: user, isLoading } = useQuery({
@@ -465,6 +611,9 @@ export default function UserDetail() {
       {reasonModal && (
         <ReasonModal modal={reasonModal} userId={id} onClose={() => setReasonModal(null)} />
       )}
+      {resetModalOpen && (
+        <ResetModal user={user} onClose={() => setResetModalOpen(false)} />
+      )}
 
       <div className="flex items-center gap-3">
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-sm">
@@ -629,6 +778,23 @@ export default function UserDetail() {
                   {user.banned_reason}
                 </div>
               )}
+            </div>
+            {/* 전체 리셋 — 신규 가입 직후 상태로 되돌림 (온보딩 재테스트용) */}
+            <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+              <div>
+                <div className="text-sm font-medium text-red-700">
+                  {t('users.detail.account.resetTitle')}
+                </div>
+                <div className="text-xs text-red-600">
+                  {t('users.detail.account.resetDesc')}
+                </div>
+              </div>
+              <button
+                onClick={() => setResetModalOpen(true)}
+                className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-md font-medium"
+              >
+                {t('users.detail.account.resetAction')}
+              </button>
             </div>
           </div>
         </div>
